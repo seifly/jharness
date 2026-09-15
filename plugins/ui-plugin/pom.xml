@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>ui-plugin</artifactId>
+    <name>ui-plugin</name>
+    <description>UI 界面插件（Web Console 前端 + REST 控制器）</description>
+
+    <properties>
+        <plugin.id>ui-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.ui.UiPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>UI：人怎么和 Agent 交互？</plugin.description>
+    </properties>
+
+    <dependencies>
+        <!-- JSON 处理（WebUtils 和各控制器的 JSON 序列化） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!--
+          ChatController 使用 SseEmitter（org.springframework.web.servlet.mvc.method.annotation），
+          该类位于 spring-webmvc；运行时由宿主 spring-boot-starter-web 提供，故此处 provided。
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          Redis 共享数据访问层已包含在 plugin-framework SDK 中（jedis + jackson）。
+          控制器通过 RedisShared.store() 获取 ConfigStore，从 Redis 读取各插件配置数据，
+          不再直接 @Autowired 注入跨插件对象。
+        -->
+        <!--
+          跨插件依赖（编译期）：
+          SkillsController 引用 skills-plugin 的 SkillsLoader / SkillInfo，
+          按文件系统（workspace/skills > global > builtin）管理技能。
+          运行期共享：由 plugin.properties 的 plugin.dependencies=skills-plugin 声明，
+          SpringPluginManager#loadPlugins 按依赖拓扑排序加载，使 skills-plugin 的类
+          挂入 ui-plugin 类加载器的父链（与 tools-plugin / workflow-plugin 同机制）。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>skills-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

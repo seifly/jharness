@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>jharness</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>plugin-app</artifactId>
+    <name>plugin-app</name>
+    <description>PF4J 插件管理主应用（Spring Boot 3）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- 扩展点 SDK（主应用必须依赖，插件接口由主应用 ClassLoader 提供） -->
+        <dependency>
+            <groupId>${sdk.groupId}</groupId>
+            <artifactId>${sdk.artifactId}</artifactId>
+        </dependency>
+
+        <!-- PF4J 核心框架 -->
+        <dependency>
+            <groupId>org.pf4j</groupId>
+            <artifactId>pf4j</artifactId>
+        </dependency>
+
+        <!--
+          开发期共享第三方依赖（宿主 ClassLoader 暴露给所有插件 ClassLoader）：
+          PF4J 插件使用独立 ClassLoader，父加载器即主应用 ClassLoader；
+          开发期直接跑 Maven 模块目录（不走打 fat jar / 复制到 lib 目录的流程），
+          插件自己的 compile 依赖只在 Maven 本地仓库中，插件 classpath 拿不到。
+          把各插件公共/重依赖放在宿主侧，同时支持 plugins/.lib/*.jar 作为插件私有依赖，
+          避免「部署期独立打包、开发期源码运行」两种场景互相冲突。
+        -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <!-- WechatChannel 运行期依赖（channel-plugin） -->
+        <dependency>
+            <groupId>io.github.lith0924</groupId>
+            <artifactId>wechat-ilink-sdk</artifactId>
+            <version>2.2.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+        <!-- FeishuChannel 运行期依赖（channel-plugin） -->
+        <dependency>
+            <groupId>com.larksuite.oapi</groupId>
+            <artifactId>oapi-sdk</artifactId>
+            <version>2.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!--
+                        spring-boot:run 默认把 workingDirectory 设为 plugin-app 模块目录，
+                        导致 application.yml 里相对路径 plugins 解析到 plugin-app/plugins（不存在）。
+                        这里显式切到工程根，使 plugins/ 聚合模块、runtime-plugins/ 等约定路径都可命中。
+                    -->
+                    <workingDirectory>${project.parent.basedir}</workingDirectory>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

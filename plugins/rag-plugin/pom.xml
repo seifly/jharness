@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>rag-plugin</artifactId>
+    <name>rag-plugin</name>
+    <description>Java RAG 知识库插件（VectorStore SPI + Qwen3 Embedding + Redis Vector Search）</description>
+
+    <properties>
+        <plugin.id>rag-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.rag.RagPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>RAG\uff1a\u4e00\u5207\u7684\u63d2\u4ef6\u5316\u77e5\u8bc6\u5e93\uff08VectorStore SPI / Qwen3 Embedding / Redis HNSW）</plugin.description>
+
+
+        <junit.version>5.10.2</junit.version>
+    </properties>
+
+    <dependencies>
+        <!-- ============ 宿主 / SDK 提供（不随 fat-jar 分发） ============ -->
+        <!-- plugin-framework SDK（BaseException / ApiResult / ExtensionPoint 等） -->
+        <dependency>
+            <groupId>org.pf4j</groupId>
+            <artifactId>pf4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- 插件内部使用子 Spring 应用上下文装配 Bean，需要 spring-context（宿主提供） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ============ 插件自带（随 fat-jar 分发） ============ -->
+
+
+
+
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              覆盖父工程 maven-shade-plugin 的同一 execution(id=shade)：
+              1. 继承父的 filter：排除 SDK 类（cn/seifly/jharness/plugin/framework/**），避免与主应用接口不是同一 Class；
+              2. 新增 ServicesResourceTransformer：合并各依赖的 META-INF/services（Tika / ONNX 等的 SPI 注册）。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>cn/seifly/jharness/plugin/framework/**</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

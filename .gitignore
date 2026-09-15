@@ -1,0 +1,26 @@
+# === IDE / 编辑器 ===
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+
+# === 操作系统 ===
+.DS_Store
+Thumbs.db
+
+# === Maven 构建产物 ===
+target/
+*.class
+*.jar
+*.war
+
+# === 日志 ===
+*.log
+logs/
+
+# === 运行时插件目录（形态 B：目录链接与 .lib 依赖均为本地生成） ===
+runtime-plugins/*
+!runtime-plugins/.gitkeep
+/doc/

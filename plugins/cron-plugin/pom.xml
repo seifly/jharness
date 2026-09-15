@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>cron-plugin</artifactId>
+    <name>cron-plugin</name>
+    <description>定时任务插件</description>
+
+    <properties>
+        <plugin.id>cron-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.cron.CronPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>Cron：定时调度</plugin.description>
+    </properties>
+
+    <dependencies>
+        <!-- Quartz 定时任务调度框架 -->
+        <dependency>
+            <groupId>org.quartz-scheduler</groupId>
+            <artifactId>quartz</artifactId>
+            <version>2.3.2</version>
+        </dependency>
+        <!-- cron-utils：cron 表达式解析与下次执行时间计算（CronService 使用） -->
+        <dependency>
+            <groupId>com.cronutils</groupId>
+            <artifactId>cron-utils</artifactId>
+            <version>9.1.6</version>
+        </dependency>
+        <!-- JSON 处理（CronStore 持久化） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <!--
+          TODO 跨插件依赖（待 config 分散到各插件后处理）：
+          CronService 引用 config.Config / CronConfig。
+        -->
+    </dependencies>
+</project>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 禁用 logback 启动时的状态信息输出 -->
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+
+    <!-- 控制台输出配置 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+        </filter>
+        <encoder>
+            <!-- 日志格式：时间 [线程] 级别 logger(类名:行号) - 消息 -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36}:%line - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 文件输出配置：所有日志写入文件 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${user.home}/.jharness/logs/jharness.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${user.home}/.jharness/logs/jharness.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36}:%line - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 特定包的日志级别配置 -->
+    <logger name="cn.seifly.jharness" level="DEBUG"/>
+    <logger name="org.pf4j" level="INFO"/>
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="com.lark.oapi" level="WARN"/>
+    <logger name="com.larksuite.oapi" level="WARN"/>
+    <logger name="okhttp3" level="WARN"/>
+    <logger name="net.dv8tion" level="WARN"/>
+    <logger name="org.telegram" level="WARN"/>
+
+    <!-- 根日志配置 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

@@ -1,0 +1,422 @@
+package cn.seifly.jharness.plugins.workflow;
+
+import cn.seifly.jharness.plugin.framework.bus.InboundMessage;
+import cn.seifly.jharness.plugin.framework.bus.MessageBus;
+import cn.seifly.jharness.plugin.framework.bus.OutboundMessage;
+import cn.seifly.jharness.plugin.framework.service.StreamCallback;
+import cn.seifly.jharness.plugins.channel.Channel;
+import cn.seifly.jharness.plugins.channel.ChannelManager;
+import cn.seifly.jharness.plugin.framework.config.Config;
+import lombok.extern.slf4j.Slf4j;
+import cn.seifly.jharness.plugin.framework.llm.LlmService;
+import cn.seifly.jharness.plugin.framework.llm.Message;
+import cn.seifly.jharness.plugins.sessions.SessionManager;
+import cn.seifly.jharness.plugin.framework.StringUtils;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 消息路由器，负责将入站消息分发到不同的处理逻辑。
+ *
+ * <p>从 AgentRuntime 中抽取的消息路由逻辑，包括指令处理、用户消息处理、
+ * 系统消息处理、流式输出支持等功能。</p>
+ */
+@Slf4j
+class MessageRouter {
+
+    private static final String PROVIDER_NOT_CONFIGURED_MSG =
+            "⚠️ LLM Provider 未配置，请通过 Web Console 的 Settings -> Models 页面配置 API Key 后再试。";
+    private static final String DEFAULT_EMPTY_RESPONSE = "已完成处理但没有回复内容。";
+    private static final int LOG_PREVIEW_LENGTH = 80;
+
+    private final ProviderManager providerManager;
+    private final MessageBus bus;
+    private final SessionManager sessions;
+    private final ContextBuilder contextBuilder;
+    private final Config config;
+
+    private volatile ChannelManager channelManager;
+
+    MessageRouter(ProviderManager providerManager, MessageBus bus,
+                  SessionManager sessions, ContextBuilder contextBuilder, Config config) {
+        this.providerManager = providerManager;
+        this.bus = bus;
+        this.sessions = sessions;
+        this.contextBuilder = contextBuilder;
+        this.config = config;
+    }
+
+    void setChannelManager(ChannelManager channelManager) {
+        this.channelManager = channelManager;
+    }
+
+    // ==================== 主路由入口 ====================
+
+    /**
+     * 路由消息到对应的处理逻辑。
+     *
+     * @param msg 入站消息
+     * @return 处理结果
+     */
+    String route(InboundMessage msg) throws Exception {
+        logIncoming(msg);
+
+        if (msg.isCommand()) {
+            return routeCommand(msg);
+        }
+
+        if ("system".equals(msg.getChannel())) {
+            return routeSystem(msg);
+        }
+        return routeUser(msg, null);
+    }
+
+    // ==================== 指令消息处理 ====================
+
+    /**
+     * 路由指令消息（如 /new、/stop）。
+     */
+    String routeCommand(InboundMessage msg) {
+        String command = msg.getCommand();
+
+        if (InboundMessage.COMMAND_NEW_SESSION.equals(command)) {
+            return handleNewSessionCommand(msg);
+        }
+        
+        if (InboundMessage.COMMAND_STOP.equals(command)) {
+            return handleStopCommand(msg);
+        }
+
+        log.warn("Unknown command received: command={}", command);
+        String unknownResponse = "未知指令: /" + command;
+        publishReplyIfNeeded(msg, unknownResponse);
+        return unknownResponse;
+    }
+
+    /**
+     * 处理 /new 指令：开启全新会话。
+     */
+    String handleNewSessionCommand(InboundMessage msg) {
+        String newSessionKey = msg.getSessionKey();
+
+        sessions.getOrCreate(newSessionKey);
+
+        log.info("New session created by /new command: new_session_key={}, channel={}, sender_id={}",
+                newSessionKey, msg.getChannel(), msg.getSenderId());
+
+        String response = "✨ 新会话已开启，让我们开始新的对话吧！";
+        publishReplyIfNeeded(msg, response);
+        return response;
+    }
+    
+    /**
+     * 处理 /stop 指令：中断当前正在执行的 LLM 任务。
+     */
+    String handleStopCommand(InboundMessage msg) {
+        log.info("Processing /stop command: channel={}, sender_id={}, session_key={}",
+                msg.getChannel(), msg.getSenderId(), msg.getSessionKey());
+        
+        String response;
+        ProviderComponents comps = providerManager.getComponents();
+        if (comps != null && comps.reActExecutor != null) {
+            if (comps.reActExecutor.isRunning()) {
+                comps.reActExecutor.abort();
+                log.info("Stop command: abort signal sent to ReActExecutor: channel={}, session_key={}",
+                        msg.getChannel(), msg.getSessionKey());
+                response = "⚠️ 已发送中断信号，当前任务将被停止。";
+            } else {
+                log.info("Stop command: no active task to abort: channel={}, session_key={}",
+                        msg.getChannel(), msg.getSessionKey());
+                response = "当前没有正在执行的任务。";
+            }
+        } else {
+            log.warn("Stop command: ReActExecutor not available: channel={}", msg.getChannel());
+            response = "无法中断任务：系统组件未就绪。";
+        }
+        
+        publishReplyIfNeeded(msg, response);
+        return response;
+    }
+
+    // ==================== 用户消息处理 ====================
+
+    /**
+     * 路由用户消息到 LLM 处理。
+     *
+     * <p>#3 多模态：当 {@code images} 非空时，通过 {@link #buildContextWithImages}
+     * 构建含多模态内容（文本+图片）的上下文，使 LLM 能识别图片。</p>
+     *
+     * @param msg    入站消息
+     * @param images 图片路径列表（可为 null 或空，表示纯文本）
+     */
+    String routeUser(InboundMessage msg, List<String> images) throws Exception {
+        if (!providerManager.isConfigured()) {
+            publishReplyIfNeeded(msg, PROVIDER_NOT_CONFIGURED_MSG);
+            return PROVIDER_NOT_CONFIGURED_MSG;
+        }
+
+        String sessionKey = msg.getSessionKey();
+        // 多模态分支：有图片走 buildContextWithImages，否则普通 buildContext
+        List<Message> messages = (images != null && !images.isEmpty())
+                ? buildContextWithImages(sessionKey, msg, images)
+                : buildContext(sessionKey, msg);
+        sessions.addMessage(sessionKey, "user", msg.getContent());
+        sessions.save(sessions.getOrCreate(sessionKey));
+
+        ProviderComponents comps = providerManager.getComponents();
+        if (comps != null && comps.feedbackManager != null) {
+            comps.feedbackManager.recordMessageExchange(sessionKey);
+        }
+
+        boolean usedStreaming = isStreamingChannel(msg);
+        String response = ensureNonBlank(
+                executeWithStreamingIfSupported(msg, messages, sessionKey, usedStreaming),
+                DEFAULT_EMPTY_RESPONSE);
+
+        persistAndSummarize(sessionKey, response);
+        publishReplyIfNeeded(msg, response);
+        return response;
+    }
+
+    /**
+     * 流式路由用户消息（纯文本便捷版，等价于 {@code routeUserStream(msg, null, callback)}）。
+     */
+    void routeUserStream(InboundMessage msg, StreamCallback callback) {
+        routeUserStream(msg, null, callback);
+    }
+
+    /**
+     * 流式路由用户消息。
+     *
+     * <p>镜像 {@link #routeUser} 的会话写入与持久化逻辑，但把 LLM 执行替换为流式：
+     * 把 SDK {@link StreamCallback} 适配为本插件内部的 {@link LlmService.StreamCallback}，
+     * token 片段实时回传给调用方（如 ui-plugin 的 SSE 控制器）；最终完整回复通过
+     * {@link StreamCallback#onComplete} 回调，异常通过 {@link StreamCallback#onError} 回调。
+     *
+     * <p>#3 多模态：当 {@code images} 非空时，通过 {@link #buildContextWithImages}
+     * 构建含多模态内容（文本+图片）的上下文，使 LLM 能识别图片。</p>
+     *
+     * <p>本方法不会向调用方抛出异常——所有异常都已通过 {@code callback.onError} 上报；
+     * 调用方只需提供 {@link StreamCallback} 实现即可。</p>
+     *
+     * @param msg      入站消息
+     * @param images   图片路径列表（可为 null 或空，表示纯文本）
+     * @param callback 流式回调
+     */
+    void routeUserStream(InboundMessage msg, List<String> images, StreamCallback callback) {
+        if (!providerManager.isConfigured()) {
+            callback.onComplete(PROVIDER_NOT_CONFIGURED_MSG);
+            return;
+        }
+
+        String sessionKey = msg.getSessionKey();
+        List<Message> messages;
+        try {
+            // 多模态分支：有图片走 buildContextWithImages，否则普通 buildContext
+            messages = (images != null && !images.isEmpty())
+                    ? buildContextWithImages(sessionKey, msg, images)
+                    : buildContext(sessionKey, msg);
+            sessions.addMessage(sessionKey, "user", msg.getContent());
+            sessions.save(sessions.getOrCreate(sessionKey));
+        } catch (RuntimeException e) {
+            callback.onError(e);
+            return;
+        }
+
+        ProviderComponents comps = providerManager.getComponents();
+        if (comps == null || comps.reActExecutor == null) {
+            callback.onError(new IllegalStateException("ReActExecutor 未就绪"));
+            return;
+        }
+        //记录会话消息交互。
+        if (comps.feedbackManager != null) {
+            comps.feedbackManager.recordMessageExchange(sessionKey);
+        }
+
+        // 适配：SDK StreamCallback（onChunk/onComplete/onError）→ LlmService.StreamCallback（@FunctionalInterface, 仅 onChunk）
+        // 完整回复与异常由 executeStream 的返回值 / 抛出值分别处理
+        LlmService.StreamCallback llmCallback = chunk -> {
+            try {
+                callback.onChunk(chunk);
+            } catch (Throwable t) {
+                // 调用方在 onChunk 中抛出的异常不应中断 LLM 流式输出
+                log.warn("StreamCallback.onChunk 抛出异常，忽略: error={}", t.toString());
+            }
+        };
+
+        String response;
+        try {
+            response = comps.reActExecutor.executeStream(messages, sessionKey, llmCallback);
+        } catch (Exception e) {
+            callback.onError(e);
+            return;
+        }
+
+        response = ensureNonBlank(response, DEFAULT_EMPTY_RESPONSE);
+        persistAndSummarize(sessionKey, response);
+        publishReplyIfNeeded(msg, response);
+        callback.onComplete(response);
+    }
+
+    /**
+     * 判断当前消息的目标通道是否支持流式输出。
+     */
+    boolean isStreamingChannel(InboundMessage msg) {
+        if (channelManager == null || "cli".equals(msg.getChannel())) {
+            return false;
+        }
+        Channel channel = channelManager.getChannel(msg.getChannel()).orElse(null);
+        return channel != null && channel.supportsStreaming();
+    }
+
+    /**
+     * 根据目标通道是否支持流式输出，选择对应的 LLM 执行路径。
+     *
+     * <p>若通道支持流式（如钉钉），则先发送占位消息告知用户正在处理，
+     * LLM 完成后通过通道直接发送完整回复，避免重复发送。</p>
+     *
+     * @param msg           入站消息，用于获取通道名称和 chatId
+     * @param messages      已构建好的上下文消息列表
+     * @param sessionKey    当前会话 key
+     * @param usedStreaming 是否走流式路径
+     * @return LLM 生成的完整回复内容
+     */
+    private String executeWithStreamingIfSupported(InboundMessage msg,
+                                                   List<Message> messages,
+                                                   String sessionKey,
+                                                   boolean usedStreaming) throws Exception {
+        if (!usedStreaming) {
+            ProviderComponents comps = providerManager.getComponents();
+            return comps.reActExecutor.execute(messages, sessionKey);
+        }
+
+        Channel channel = channelManager.getChannel(msg.getChannel()).orElse(null);
+        LlmService.StreamCallback streamingCallback = channel.createStreamingCallback(msg.getChatId());
+
+        log.info("Using streaming output for channel: channel={}", msg.getChannel());
+        ProviderComponents comps = providerManager.getComponents();
+        return comps.reActExecutor.executeStream(messages, sessionKey, streamingCallback);
+    }
+
+    /**
+     * 将回复发布到出站队列，使 ChannelManager 能将消息路由到对应通道。
+     * 仅对来自外部通道的消息发布（跳过 CLI 直接调用）。
+     */
+    private void publishReplyIfNeeded(InboundMessage msg, String response) {
+        String channel = msg.getChannel();
+        if ("cli".equals(channel)) {
+            return;
+        }
+        bus.publishOutbound(new OutboundMessage(channel, msg.getChatId(), response));
+    }
+
+    // ==================== 系统消息处理 ====================
+
+    /**
+     * 路由系统消息到 LLM 处理。
+     */
+    String routeSystem(InboundMessage msg) throws Exception {
+        log.info("Processing system message: sender_id={}, chat_id={}",
+                msg.getSenderId(), msg.getChatId());
+
+        String[] origin = parseOrigin(msg.getChatId());
+        String originChannel = origin[0];
+        String originChatId = origin[1];
+        String sessionKey = originChannel + ":" + originChatId;
+        String userMessage = "[System: " + msg.getSenderId() + "] " + msg.getContent();
+
+        InboundMessage syntheticMessage =
+                new InboundMessage(originChannel, msg.getSenderId(), originChatId, userMessage);
+        List<Message> messages = buildContext(sessionKey, syntheticMessage);
+        sessions.addMessage(sessionKey, "user", userMessage);
+        sessions.save(sessions.getOrCreate(sessionKey));
+
+        ProviderComponents comps = providerManager.getComponents();
+        String response = ensureNonBlank(
+                comps.reActExecutor.execute(messages, sessionKey), "Background task completed.");
+
+        persistAndSummarize(sessionKey, response);
+        bus.publishOutbound(new OutboundMessage(originChannel, originChatId, response));
+        return response;
+    }
+
+    // ==================== 上下文与会话辅助 ====================
+
+    /**
+     * 构建上下文消息列表。
+     */
+    List<Message> buildContext(String sessionKey, InboundMessage msg) {
+        return contextBuilder.buildMessages(
+                sessions.getHistory(sessionKey),
+                sessions.getSummary(sessionKey),
+                msg.getContent(), msg.getChannel(), msg.getChatId());
+    }
+
+    /**
+     * 构建带图片的上下文（多模态）。
+     */
+    List<Message> buildContextWithImages(String sessionKey, InboundMessage msg, List<String> images) {
+        return contextBuilder.buildMessages(
+                sessions.getHistory(sessionKey),
+                sessions.getSummary(sessionKey),
+                msg.getContent(), images, msg.getChannel(), msg.getChatId());
+    }
+
+    /**
+     * 保存助手回复并按需触发会话摘要。
+     */
+    void persistAndSummarize(String sessionKey, String response) {
+        sessions.addMessage(sessionKey, "assistant", response);
+        sessions.save(sessions.getOrCreate(sessionKey));
+        ProviderComponents comps = providerManager.getComponents();
+        comps.summarizer.maybeSummarize(sessionKey);
+    }
+
+    // ==================== 静态工具方法 ====================
+
+    /**
+     * 解析原始来源信息（channel:chatId）。
+     */
+    static String[] parseOrigin(String chatId) {
+        String[] parts = chatId.split(":", 2);
+        return parts.length == 2
+                ? parts
+                : new String[]{"cli", chatId};
+    }
+
+    /**
+     * 确保字符串非空，否则返回默认值。
+     */
+    static String ensureNonBlank(String value, String fallback) {
+        return StringUtils.isBlank(value) ? fallback : value;
+    }
+
+    /**
+     * 记录入站消息日志。
+     */
+    private void logIncoming(InboundMessage msg) {
+        logIncoming(msg.getChannel(), msg.getSessionKey(), msg.getContent(),
+                msg.getChatId(), msg.getSenderId());
+    }
+
+    /**
+     * 记录入站消息日志（简化版）。
+     */
+    private void logIncoming(String channel, String sessionKey, String content,
+                             String chatId, String senderId) {
+        // 用 Map.of 无法处理可选字段（不允许 null 值），改用 HashMap 构建可选字段
+        Map<String, Object> fields = new HashMap<>();
+        fields.put("channel", channel);
+        fields.put("session_key", sessionKey);
+        fields.put("preview", StringUtils.truncate(content, LOG_PREVIEW_LENGTH));
+        if (chatId != null) {
+            fields.put("chat_id", chatId);
+        }
+        if (senderId != null) {
+            fields.put("sender_id", senderId);
+        }
+        log.info("Processing message: {}", fields);
+    }
+}

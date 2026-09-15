@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>jharness</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>plugins</artifactId>
+    <packaging>pom</packaging>
+    <name>plugins</name>
+    <description>插件集合（JHarness）</description>
+
+    <modules>
+        <module>hello-plugin</module>
+        <module>ui-plugin</module>
+        <module>themes-plugin</module>
+        <module>sessions-plugin</module>
+        <module>memory-plugin</module>
+        <module>tools-plugin</module>
+        <module>skills-plugin</module>
+        <module>workflow-plugin</module>
+        <module>channel-plugin</module>
+        <module>models-plugin</module>
+        <module>development-plugin</module>
+        <module>cron-plugin</module>
+        <module>mcp-plugin</module>
+        <module>evolution-plugin</module>
+        <module>heartbeat-plugin</module>
+        <module>rag-plugin</module>
+    </modules>
+
+    <!--
+      关键打包配置（子模块继承）：
+      1. maven-jar-plugin 写入 PF4J 插件描述符（Plugin-Id / Plugin-Class 等），
+         值通过子模块覆盖的 <properties> 注入，避免每个插件重复配置；
+      2. maven-shade-plugin 将插件依赖打成 fat-jar（插件类加载器是隔离的，
+         第三方依赖必须随插件分发），但必须 exclude 掉 SDK 包 ——
+         否则插件内的接口副本会与主应用接口不是同一个 Class，
+         导致 PF4J 的 isAssignableFrom 校验失败、扩展无法被发现。
+    -->
+    <properties>
+        <plugin.id>__placeholder__</plugin.id>
+        <plugin.class>__placeholder__</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>PF4J plugin</plugin.description>
+        <plugin.requires>*</plugin.requires>
+    </properties>
+
+    <dependencies>
+        <!-- 所有插件共同依赖 SDK -->
+        <dependency>
+            <groupId>${sdk.groupId}</groupId>
+            <artifactId>${sdk.artifactId}</artifactId>
+            <version>${sdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.pf4j</groupId>
+            <artifactId>pf4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!-- Lombok：编译期注解处理器（@Slf4j/@Data 等），provided 不随插件 fat-jar 分发 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- 插件代码使用 Spring 注解（@Autowired）所需；provided：运行时由宿主提供，且不随插件包分发 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- 插件编写 REST 控制器（@RestController / @GetMapping 等）所需；运行时由宿主提供 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Plugin-Id>${plugin.id}</Plugin-Id>
+                            <Plugin-Class>${plugin.class}</Plugin-Class>
+                            <Plugin-Version>${plugin.version}</Plugin-Version>
+                            <Plugin-Provider>${plugin.provider}</Plugin-Provider>
+                            <Plugin-Requires>${plugin.requires}</Plugin-Requires>
+                            <Plugin-Description>${plugin.description}</Plugin-Description>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- 关键：SDK 接口类必须由主应用加载，禁止打进插件包 -->
+                                        <exclude>cn/seifly/jharness/plugin/framework/**</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

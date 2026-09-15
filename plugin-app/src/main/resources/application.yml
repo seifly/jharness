@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: JHarness
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 110MB
+  pf4j:
+    # 运行时插件部署目录（相对应用运行目录），启动时自动创建。
+    # 可指向源码聚合模块 plugins/：MavenModulePluginDescriptorFinder +
+    # FlatDirectoryPluginLoader 会把每个子模块的 target/classes 作为插件 classpath 根。
+    # 共享第三方依赖放 plugins/.lib/（隐藏目录，避开插件扫描）。
+    # 使用 ../plugins 使无论从项目根还是 plugin-app/ 运行均可命中同一插件目录。
+    path: plugins
+
+logging:
+  level:
+    cn.seifly.jharness: info
+    org.pf4j: info
+    wecom: warn

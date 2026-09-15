@@ -1,0 +1,85 @@
+package cn.seifly.jharness.plugins.channel;
+
+import cn.seifly.jharness.plugin.framework.bus.OutboundMessage;
+import cn.seifly.jharness.plugin.framework.llm.LlmService;
+
+/**
+ * 消息通道接口（Telegram、Discord等）
+ *
+ */
+public interface Channel {
+    
+    /**
+     * 获取通道名称
+     */
+    String name();
+    
+    /**
+     * 启动通道
+     */
+    void start();
+    
+    /**
+     * 停止通道
+     */
+    void stop();
+    
+    /**
+     * 通过此通道发送消息
+     */
+    void send(OutboundMessage message);
+    
+    /**
+     * 检查通道是否正在运行
+     */
+    boolean isRunning();
+    
+    /**
+     * 检查发送者是否被允许
+     */
+    boolean isAllowed(String senderId);
+
+    /**
+     * 处理来自外部网关（如 qq-gateway）转发的入站消息。
+     *
+     * <p>默认实现抛出 {@link UnsupportedOperationException}。仅支持入站消息的通道
+     * （如 QQ、飞书、钉钉）应重写此方法。
+     *
+     * @param messageJson 消息 JSON 字符串
+     */
+    default void handleIncomingMessage(String messageJson) {
+        throw new UnsupportedOperationException(
+                "Channel " + name() + " does not support incoming messages");
+    }
+
+    /**
+     * 设置通道管理器引用。
+     * 由 ChannelManager 在注册通道时调用，使通道能够触发任务中断等操作。
+     */
+    default void setChannelManager(ChannelManager channelManager) {
+    }
+
+    /**
+     * 是否支持流式输出。
+     *
+     * 支持流式的通道可以在 LLM 生成过程中逐步将内容推送给用户，
+     * 而不是等待完整回复后一次性发送。默认不支持。
+     */
+    default boolean supportsStreaming() {
+        return false;
+    }
+
+    /**
+     * 创建流式输出回调。
+     *
+     * 仅在 {@link #supportsStreaming()} 返回 true 时有效。
+     * 返回的 {@link LlmService.StreamCallback} 由 AgentRuntime 传给 ReActExecutor，
+     * 通道实现负责在回调中将 LLM 生成的 chunk 实时推送给用户。
+     *
+     * @param chatId 目标会话 ID
+     * @return 流式回调实例；返回 null 时退化为普通阻塞式调用
+     */
+    default LlmService.StreamCallback createStreamingCallback(String chatId) {
+        return null;
+    }
+}

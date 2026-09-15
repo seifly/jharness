@@ -1,0 +1,1614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JHarness RAG 知识库管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            color: #333;
+            background: #f0f2f5;
+            overflow: hidden;
+        }
+        a { color: #1890ff; text-decoration: none; }
+        a:hover { color: #40a9ff; }
+
+        /* ====== Layout ====== */
+        .app { display: flex; height: 100vh; }
+
+        /* ====== Sidebar ====== */
+        .sidebar {
+            width: 208px;
+            background: #001529;
+            color: rgba(255,255,255,0.85);
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .logo {
+            padding: 18px 24px;
+            line-height: 1.4;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .logo .title { font-size: 16px; font-weight: 600; color: #fff; }
+        .logo .sub { font-size: 12px; color: rgba(255,255,255,0.45); }
+        .nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+        .nav-group { margin-bottom: 8px; }
+        .nav-group-title {
+            padding: 8px 24px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.45);
+        }
+        .nav-item {
+            padding: 10px 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        .nav-item:hover { color: #fff; }
+        .nav-item.active { color: #fff; background: #1890ff; }
+        .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+        .nav-sub {
+            padding: 8px 24px 8px 52px;
+            cursor: pointer;
+            font-size: 13px;
+            color: rgba(255,255,255,0.7);
+        }
+        .nav-sub:hover { color: #fff; }
+        .nav-sub.active { color: #fff; background: rgba(24,144,255,0.15); }
+        .sidebar-footer {
+            padding: 16px 24px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .avatar {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            background: #1890ff;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        .user-info { line-height: 1.3; }
+        .user-info .name { color: #fff; font-size: 13px; }
+        .user-info .role { font-size: 11px; color: rgba(255,255,255,0.45); }
+
+        /* ====== Main ====== */
+        .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .topbar {
+            height: 56px;
+            background: #fff;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            flex-shrink: 0;
+        }
+        .breadcrumb { color: #666; }
+        .breadcrumb .sep { margin: 0 6px; color: #ccc; }
+        .topbar-right { display: flex; align-items: center; gap: 16px; }
+        .topbar-icon {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #666;
+            font-size: 16px;
+        }
+        .topbar-icon:hover { background: #f5f5f5; }
+        .user-pill {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 12px;
+            cursor: pointer;
+            border-radius: 16px;
+        }
+        .user-pill:hover { background: #f5f5f5; }
+        .user-pill .mini-avatar {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: #1890ff;
+            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 600;
+        }
+        .user-pill .name { font-size: 13px; }
+
+        /* ====== Content ====== */
+        .content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            background: #f0f2f5;
+        }
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* ====== Stat Cards ====== */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .stat-icon {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px;
+        }
+        .stat-icon.blue { background: #e6f7ff; color: #1890ff; }
+        .stat-icon.green { background: #f6ffed; color: #52c41a; }
+        .stat-icon.orange { background: #fff7e6; color: #fa8c16; }
+        .stat-icon.purple { background: #f9f0ff; color: #722ed1; }
+        .stat-icon.cyan { background: #e6fffb; color: #13c2c2; }
+        .stat-info { flex: 1; }
+        .stat-info .label { font-size: 13px; color: #888; margin-bottom: 4px; }
+        .stat-info .value { font-size: 26px; font-weight: 600; color: #222; line-height: 1.2; }
+        .stat-info .extra { font-size: 12px; color: #999; margin-top: 4px; }
+        .stat-info .extra.up { color: #52c41a; }
+
+        /* ====== Action Bar ====== */
+        .action-bar {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .action-bar .search-group { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ====== Buttons ====== */
+        .btn {
+            padding: 6px 16px;
+            border-radius: 4px;
+            border: 1px solid #d9d9d9;
+            background: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn:hover { color: #1890ff; border-color: #1890ff; }
+        .btn-primary { background: #1890ff; color: #fff; border-color: #1890ff; }
+        .btn-primary:hover { background: #40a9ff; color: #fff; border-color: #40a9ff; }
+        .btn-danger { background: #fff; color: #ff4d4f; border-color: #ff4d4f; }
+        .btn-danger:hover { background: #ff4d4f; color: #fff; }
+        .btn-sm { padding: 4px 10px; font-size: 13px; }
+        .btn:disabled, .btn:disabled:hover { background: #f5f5f5; color: #bfbfbf; border-color: #d9d9d9; cursor: not-allowed; }
+        .btn-primary:disabled, .btn-primary:disabled:hover { background: #d9d9d9; color: #fff; border-color: #d9d9d9; cursor: not-allowed; }
+
+        /* ====== Inputs ====== */
+        .input, .select {
+            padding: 6px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input:focus, .select:focus { border-color: #40a9ff; }
+        .input::placeholder { color: #bfbfbf; }
+
+        /* ====== Table ====== */
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            background: #fafafa;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        tbody td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        tbody tr:hover { background: #fafafa; }
+        .file-cell { display: flex; align-items: center; gap: 8px; }
+        .file-icon {
+            width: 28px; height: 28px;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 11px; font-weight: 600;
+            flex-shrink: 0;
+        }
+        .file-icon.pdf { background: #ff7875; }
+        .file-icon.docx { background: #2f54eb; }
+        .file-icon.md { background: #fa8c16; }
+        .file-icon.txt { background: #52c41a; }
+        .file-icon.other { background: #8c8c8c; }
+
+        /* ====== Tags ====== */
+        .tag {
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .tag-blue { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+        .tag-green { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .tag-orange { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
+        .tag-red { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+        .tag-purple { background: #f9f0ff; color: #531dab; border: 1px solid #d3adf7; }
+        .tag-cyan { background: #e6fffb; color: #08979c; border: 1px solid #87e8de; }
+
+        /* ====== Status ====== */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status::before {
+            content: ''; width: 6px; height: 6px; border-radius: 50%;
+            background: currentColor;
+        }
+        .status-completed { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .status-processing { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+        .status-pending { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+        .status-failed { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+
+        /* ====== Progress ====== */
+        .progress-wrap { display: flex; align-items: center; gap: 8px; }
+        .progress {
+            background: #f5f5f5; border-radius: 4px;
+            height: 6px; width: 80px; overflow: hidden;
+        }
+        .progress-bar {
+            background: #1890ff; height: 100%; border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .progress-text { font-size: 12px; color: #1890ff; }
+
+        /* ====== Actions ====== */
+        .row-actions { display: flex; gap: 4px; }
+        .row-actions .btn-sm { padding: 4px 8px; }
+
+        /* ====== Pagination ====== */
+        .pagination {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-top: 16px;
+        }
+        .pagination .info { color: #666; font-size: 13px; }
+        .pagination .pages { display: flex; gap: 6px; align-items: center; }
+        .page-btn {
+            min-width: 32px; height: 32px;
+            padding: 0 8px;
+            border: 1px solid #d9d9d9;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+        }
+        .page-btn:hover { color: #1890ff; border-color: #1890ff; }
+        .page-btn.active { color: #fff; background: #1890ff; border-color: #1890ff; }
+        .page-btn:disabled { color: #bfbfbf; cursor: not-allowed; }
+
+        /* ====== Charts ====== */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .chart-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: #222;
+            margin-bottom: 16px;
+        }
+        .chart-body { display: flex; align-items: center; gap: 20px; }
+        .donut { width: 140px; height: 140px; position: relative; flex-shrink: 0; }
+        .donut-center {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .donut-center .num { font-size: 22px; font-weight: 600; color: #222; }
+        .donut-center .lbl { font-size: 12px; color: #888; }
+        .legend { flex: 1; }
+        .legend-item {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 8px; font-size: 13px;
+        }
+        .legend-dot {
+            width: 10px; height: 10px; border-radius: 2px;
+        }
+        .legend-name { color: #333; flex: 1; }
+        .legend-val { color: #888; font-size: 12px; }
+        .recent-list { list-style: none; }
+        .recent-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 0; border-bottom: 1px dashed #f0f0f0;
+        }
+        .recent-item:last-child { border-bottom: none; }
+        .recent-icon {
+            width: 28px; height: 28px;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 11px; font-weight: 600;
+            flex-shrink: 0;
+        }
+        .recent-name { flex: 1; font-size: 13px; color: #333; }
+        .recent-time { font-size: 12px; color: #999; }
+
+        /* ====== Upload ====== */
+        .upload-area {
+            background: #fff;
+            border: 2px dashed #d9d9d9;
+            border-radius: 8px;
+            padding: 48px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-area:hover { border-color: #1890ff; background: #fafafa; }
+        .upload-area.dragover { border-color: #1890ff; background: #e6f7ff; }
+        .upload-area .icon { font-size: 48px; color: #1890ff; margin-bottom: 12px; }
+        .upload-area .hint { color: #666; }
+        .upload-area .sub-hint { color: #999; font-size: 12px; margin-top: 8px; }
+
+        /* ====== Search Box ====== */
+        .search-page {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        .search-input-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+        }
+        .search-input-card textarea {
+            width: 100%; min-height: 100px;
+            padding: 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        .search-options {
+            display: flex; gap: 16px; align-items: center;
+            margin-top: 12px; flex-wrap: wrap;
+        }
+        .search-results {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .result-item {
+            padding: 16px;
+            border: 1px solid #f0f0f0;
+            border-radius: 4px;
+            margin-bottom: 12px;
+        }
+        .result-item .meta {
+            display: flex; gap: 12px;
+            font-size: 12px; color: #999;
+            margin-bottom: 8px;
+        }
+        .result-item .meta .score {
+            background: #e6f7ff; color: #1890ff;
+            padding: 1px 6px; border-radius: 4px;
+        }
+        .result-item .content {
+            font-size: 14px; color: #333; line-height: 1.6;
+        }
+
+        /* ====== Empty / Loading ====== */
+        .empty {
+            padding: 48px;
+            text-align: center;
+            color: #999;
+        }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+        .loading {
+            padding: 48px;
+            text-align: center;
+            color: #999;
+        }
+
+        /* ====== Modal ====== */
+        .modal-mask {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.45);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+        .modal-mask.show { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 8px;
+            width: 90%; max-width: 600px;
+            max-height: 80vh;
+            display: flex; flex-direction: column;
+        }
+        .modal-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-title { font-size: 16px; font-weight: 500; }
+        .modal-close {
+            cursor: pointer; color: #999; font-size: 18px;
+            width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 4px;
+        }
+        .modal-close:hover { background: #f5f5f5; }
+        .modal-body { padding: 24px; overflow-y: auto; flex: 1; }
+        .modal-footer {
+            padding: 12px 24px;
+            border-top: 1px solid #f0f0f0;
+            display: flex; justify-content: flex-end; gap: 8px;
+        }
+
+        /* ====== Toast ====== */
+        .toast {
+            position: fixed; top: 24px; right: 24px;
+            background: #fff;
+            border-radius: 4px;
+            padding: 10px 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 2000;
+            display: none;
+            min-width: 200px;
+        }
+        .toast.show { display: flex; align-items: center; gap: 8px; }
+        .toast.success { border-left: 3px solid #52c41a; }
+        .toast.error { border-left: 3px solid #ff4d4f; }
+        .toast.info { border-left: 3px solid #1890ff; }
+
+        /* ====== Responsive ====== */
+        @media (max-width: 1200px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .charts-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- ===== Sidebar ===== -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="title">JHarness RAG</div>
+                <div class="sub">知识库管理</div>
+            </div>
+            <nav class="nav">
+                <div class="nav-item" data-view="dashboard">
+                    <span class="icon">🏠</span>首页
+                </div>
+                <div class="nav-group">
+                    <div class="nav-item active" data-view="documents">
+                        <span class="icon">📄</span>文档管理
+                    </div>
+                    <div class="nav-sub" data-view="upload">📤 批量上传</div>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-item" data-view="knowledge-base">
+                        <span class="icon">📚</span>知识库
+                    </div>
+                    <div class="nav-sub" data-view="processing">⚙️ 数据处理</div>
+                </div>
+                <div class="nav-item" data-view="search">
+                    <span class="icon">🔍</span>向量检索
+                </div>
+                <div class="nav-item" data-view="vector-search">
+                    <span class="icon">🤖</span>模型管理
+                </div>
+                <div class="nav-item" data-view="settings">
+                    <span class="icon">⚙️</span>系统设置
+                </div>
+            </nav>
+            <div style="border-top:1px solid rgba(255,255,255,.08);margin:8px 12px;"></div>
+            <div class="nav-item" data-view="logs">
+                <span class="icon">❓</span>帮助与文档
+            </div>
+            <div class="sidebar-footer" style="flex-direction:column;align-items:flex-start;padding:16px 20px 20px;">
+                <div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.5);font-size:13px;">
+                    <span style="font-size:18px;">🍃</span>RAG 让知识更有价值
+                </div>
+                <div style="color:rgba(255,255,255,.3);font-size:11px;margin-left:26px;">v1.0.0</div>
+            </div>
+        </aside>
+
+        <!-- ===== Main ===== -->
+        <main class="main">
+            <header class="topbar">
+                <div class="breadcrumb">
+                    <span id="bc-level1">文档管理</span>
+                    <span class="sep">/</span>
+                    <span id="bc-level2">文档列表</span>
+                </div>
+                <div class="topbar-right">
+                    <div class="topbar-icon" title="通知">🔔</div>
+                    <div class="topbar-icon" title="帮助">❓</div>
+                    <div class="user-pill">
+                        <div class="mini-avatar">A</div>
+                        <span class="name">admin</span>
+                        <span style="color:#999;font-size:10px;">▼</span>
+                    </div>
+                </div>
+            </header>
+
+            <section class="content">
+                <!-- ========== Dashboard ========== -->
+                <div class="view" id="view-dashboard">
+                    <div class="stats" id="dashboard-stats">
+                        <div class="stat-card">
+                            <div class="stat-icon blue">📁</div>
+                            <div class="stat-info">
+                                <div class="label">文档总数</div>
+                                <div class="value" id="stat-total">0</div>
+                                <div class="extra">较昨日 <span class="up">+0</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">✅</div>
+                            <div class="stat-info">
+                                <div class="label">已处理文档</div>
+                                <div class="value" id="stat-processed">0</div>
+                                <div class="extra">占比 <span id="stat-processed-rate">0%</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange">🧩</div>
+                            <div class="stat-info">
+                                <div class="label">Chunk 总数</div>
+                                <div class="value" id="stat-chunks">0</div>
+                                <div class="extra">较昨日 <span class="up">+0</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon purple">🎯</div>
+                            <div class="stat-info">
+                                <div class="label">向量总数</div>
+                                <div class="value" id="stat-vectors">0</div>
+                                <div class="extra">维度 <span id="stat-dim">1024</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon cyan">💾</div>
+                            <div class="stat-info">
+                                <div class="label">存储使用</div>
+                                <div class="value" id="stat-storage">0 MB</div>
+                                <div class="extra">占用率 <span id="stat-storage-rate">0%</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-row">
+                        <div class="chart-card">
+                            <div class="chart-title">文档类型分布</div>
+                            <div class="chart-body">
+                                <div class="donut" id="chart-types"></div>
+                                <ul class="legend" id="legend-types"></ul>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">处理状态分布</div>
+                            <div class="chart-body">
+                                <div class="donut" id="chart-status"></div>
+                                <ul class="legend" id="legend-status"></ul>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">最近上传</div>
+                            <ul class="recent-list" id="recent-uploads">
+                                <li class="empty" style="padding:20px;">暂无数据</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== Documents ========== -->
+                <div class="view active" id="view-documents">
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-icon blue">📁</div>
+                            <div class="stat-info">
+                                <div class="label">文档总数</div>
+                                <div class="value" id="doc-stat-total">0</div>
+                                <div class="extra">较昨日 <span class="up" id="doc-stat-total-trend">+0</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">✅</div>
+                            <div class="stat-info">
+                                <div class="label">已处理文档</div>
+                                <div class="value" id="doc-stat-processed">0</div>
+                                <div class="extra">占比 <span id="doc-stat-processed-rate">0%</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange">🧩</div>
+                            <div class="stat-info">
+                                <div class="label">Chunk 总数</div>
+                                <div class="value" id="doc-stat-chunks">0</div>
+                                <div class="extra">较昨日 <span class="up" id="doc-stat-chunks-trend">+0</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon purple">🎯</div>
+                            <div class="stat-info">
+                                <div class="label">向量总数</div>
+                                <div class="value" id="doc-stat-vectors">0</div>
+                                <div class="extra">维度 <span id="doc-stat-dim">1024</span></div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon cyan">💾</div>
+                            <div class="stat-info">
+                                <div class="label">存储使用</div>
+                                <div class="value" id="doc-stat-storage">0 MB</div>
+                                <div class="extra">占用率 <span id="doc-stat-storage-rate">0%</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-bar">
+                        <button class="btn btn-primary" onclick="switchView('upload')">📤 上传文档</button>
+                        <button class="btn btn-danger" onclick="batchDelete()">🗑 批量删除</button>
+                        <button class="btn" onclick="toast('功能开发中', 'info')">🔄 重新处理</button>
+                        <button class="btn" onclick="loadDocuments()">🔃 刷新</button>
+                        <div class="search-group">
+                            <input class="input" id="doc-search-name" placeholder="输入文件名/文档名称" style="width:200px;">
+                            <select class="select" id="doc-search-kb"><option value="">全部知识库</option></select>
+                            <select class="select" id="doc-search-status"><option value="">全部状态</option></select>
+                            <button class="btn btn-primary" onclick="loadDocuments()">🔍 搜索</button>
+                            <button class="btn" onclick="resetDocSearch()">重置</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;"><input type="checkbox" id="doc-check-all" onchange="toggleCheckAll(this)"></th>
+                                    <th>文件名</th>
+                                    <th>文档名称</th>
+                                    <th>知识库</th>
+                                    <th>文件类型</th>
+                                    <th>大小</th>
+                                    <th>Chunk 数</th>
+                                    <th>状态</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documents-tbody">
+                                <tr><td colspan="10" class="loading">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="pagination">
+                            <div class="info" id="pagination-info">共 0 条记录</div>
+                            <div class="pages" id="pagination-pages"></div>
+                            <div>
+                                <select class="select" id="page-size" onchange="changePageSize(this.value)">
+                                    <option value="10">10 条/页</option>
+                                    <option value="20">20 条/页</option>
+                                    <option value="50">50 条/页</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-row">
+                        <div class="chart-card">
+                            <div class="chart-title">文档类型分布</div>
+                            <div class="chart-body">
+                                <div class="donut" id="doc-chart-types"></div>
+                                <ul class="legend" id="doc-legend-types"></ul>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">处理状态分布</div>
+                            <div class="chart-body">
+                                <div class="donut" id="doc-chart-status"></div>
+                                <ul class="legend" id="doc-legend-status"></ul>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">最近上传</div>
+                            <ul class="recent-list" id="doc-recent-uploads"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== Upload ========== -->
+                <div class="view" id="view-upload">
+                    <div class="upload-area" id="upload-area">
+                        <div class="icon">📤</div>
+                        <div class="hint">点击或拖拽文件到此处上传</div>
+                        <div class="sub-hint">支持 PDF / DOCX / TXT / Markdown，单文件最大 50MB</div>
+                        <input type="file" id="upload-input" multiple style="display:none;"
+                               accept=".pdf,.docx,.txt,.md,.markdown">
+                    </div>
+                    <div style="margin-top:16px;display:flex;gap:12px;align-items:center;">
+                        <label>归属知识库
+                            <select class="select" id="upload-kb"><option value="default">default（默认）</option></select>
+                        </label>
+                        <span style="color:#999;font-size:12px;">文档将归入所选知识库，检索时按知识库隔离</span>
+                    </div>
+                    <div class="table-container" style="margin-top:16px;" id="upload-list-wrap" style="display:none;">
+                        <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                            <span>待上传文件 (<span id="upload-count">0</span>)</span>
+                            <div>
+                                <button class="btn" onclick="clearUploadList()">清空</button>
+                                <button class="btn btn-primary" id="btn-upload-submit" onclick="submitUploads()" disabled>开始上传</button>
+                            </div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr><th>文件名</th><th>大小</th><th>类型</th><th>状态</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="upload-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ========== Search ========== -->
+                <div class="view" id="view-search">
+                    <div class="search-page">
+                        <div class="search-input-card">
+                            <div style="margin-bottom:12px;font-weight:500;">🔍 RAG 检索</div>
+                            <textarea id="search-query" placeholder="输入查询问题，系统将基于知识库内容进行检索..."></textarea>
+                            <div class="search-options">
+                                <label>Top-K <input class="input" type="number" id="search-topk" value="5" min="1" max="50" style="width:70px;"></label>
+                                <label>知识库 <select class="select" id="search-kb"><option value="">全部（查询所有库）</option></select></label>
+                                <label>租户 <input class="input" id="search-tenant" placeholder="留空查询全部"></label>
+                                <button class="btn btn-primary" onclick="doSearch()">🔍 检索</button>
+                            </div>
+                        </div>
+                        <div class="search-results" id="search-results">
+                            <div class="empty">
+                                <div class="icon">🔍</div>
+                                <div>输入问题开始检索</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== Vector Search ========== -->
+                <div class="view" id="view-vector-search">
+                    <div class="search-page">
+                        <div class="search-input-card">
+                            <div style="margin-bottom:12px;font-weight:500;">🎯 向量搜索</div>
+                            <textarea id="vs-query" placeholder="输入查询文本，按向量相似度检索最相似的内容..."></textarea>
+                            <div class="search-options">
+                                <label>Top-K <input class="input" type="number" id="vs-topk" value="5" min="1" max="50" style="width:70px;"></label>
+                                <button class="btn btn-primary" onclick="doVectorSearch()">🎯 搜索</button>
+                            </div>
+                        </div>
+                        <div class="search-results" id="vs-results">
+                            <div class="empty">
+                                <div class="icon">🎯</div>
+                                <div>输入文本开始向量搜索</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== Knowledge Base ========== -->
+                <div class="view" id="view-knowledge-base">
+                    <div class="action-bar">
+                        <button class="btn btn-primary" onclick="showCreateKbModal()">📚 新建知识库</button>
+                        <button class="btn" onclick="loadKnowledgeBases()">🔃 刷新</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>知识库ID</th>
+                                    <th>名称</th>
+                                    <th>描述</th>
+                                    <th>租户</th>
+                                    <th>文档数</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="kb-tbody">
+                                <tr><td colspan="7" class="loading">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ========== Settings ========== -->
+                <div class="view" id="view-settings">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <div>
+                            <div style="font-size:18px;font-weight:600;">⚙️ 系统设置</div>
+                            <div style="color:#999;font-size:12px;margin-top:4px;">配置参数、服务连接、模型等信息（来源：application.yml，只读）</div>
+                        </div>
+                        <button class="btn" onclick="loadConfig()">🔃 刷新</button>
+                    </div>
+                    <div id="settings-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;align-items:start;">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- ========== Logs ========== -->
+                <div class="view" id="view-logs">
+                    <div class="table-container">
+                        <div style="padding:20px;text-align:center;color:#999;">
+                            <div style="font-size:48px;margin-bottom:12px;">📋</div>
+                            <div>日志管理功能开发中</div>
+                            <div style="font-size:12px;margin-top:8px;">查看主应用日志即可定位 RAG 插件运行情况</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== Processing ========== -->
+                <div class="view" id="view-processing">
+                    <div class="table-container">
+                        <div style="padding:20px;text-align:center;color:#999;">
+                            <div style="font-size:48px;margin-bottom:12px;">⚙️</div>
+                            <div>数据处理功能开发中</div>
+                            <div style="font-size:12px;margin-top:8px;">当前文档处理在上传时同步进行</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ====== Modal ====== -->
+    <div class="modal-mask" id="modal-mask">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-title">详情</div>
+                <div class="modal-close" onclick="closeModal()">✕</div>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer" id="modal-footer">
+                <button class="btn" onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Toast ====== -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // ========== API Client ==========
+    const API_BASE = '/api/rag';
+
+    async function api(path, options = {}) {
+        const opts = {
+            headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+            ...options,
+        };
+        if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
+            opts.body = JSON.stringify(opts.body);
+        }
+        try {
+            const resp = await fetch(API_BASE + path, opts);
+            const text = await resp.text();
+            let data;
+            try { data = JSON.parse(text); } catch { data = text; }
+            if (resp.ok) {
+                if (data && typeof data === 'object' && 'code' in data) {
+                    const isOk = data.code === 'OK' || data.code === 0 || data.code === '0' || data.code === 200;
+                    if (!isOk) {
+                        throw new Error(data.message || '请求失败');
+                    }
+                    return data.data !== undefined ? data.data : data;
+                }
+                return data;
+            }
+            throw new Error((data && data.message) || `HTTP ${resp.status}`);
+        } catch (e) {
+            console.error('API error:', e);
+            toast(e.message || '网络错误', 'error');
+            throw e;
+        }
+    }
+
+    // ========== Toast ==========
+    function toast(msg, type = 'success') {
+        const el = document.getElementById('toast');
+        el.className = 'toast show ' + type;
+        el.innerHTML = (type === 'success' ? '✅ ' : type === 'error' ? '❌ ' : 'ℹ️ ') + escapeHtml(msg);
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    // ========== Modal ==========
+    function showModal(title, bodyHtml, footerHtml) {
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-body').innerHTML = bodyHtml;
+        document.getElementById('modal-footer').innerHTML = footerHtml || '<button class="btn" onclick="closeModal()">关闭</button>';
+        document.getElementById('modal-mask').classList.add('show');
+    }
+    function closeModal() {
+        document.getElementById('modal-mask').classList.remove('show');
+    }
+
+    // ========== Navigation ==========
+    const VIEW_TITLES = {
+        'dashboard': ['首页', '仪表盘'],
+        'documents': ['文档管理', '文档列表'],
+        'upload': ['文档管理', '批量上传'],
+        'processing': ['知识库', '数据处理'],
+        'search': ['向量检索', 'RAG 检索'],
+        'vector-search': ['模型管理', '向量搜索'],
+        'knowledge-base': ['知识库', '知识库列表'],
+        'settings': ['系统设置', '参数配置'],
+        'logs': ['帮助与文档', '运行日志'],
+    };
+
+    function switchView(view) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-' + view).classList.add('active');
+        document.querySelectorAll('.nav-item, .nav-sub').forEach(n => n.classList.remove('active'));
+        const nav = document.querySelector(`[data-view="${view}"]`);
+        if (nav) nav.classList.add('active');
+        const [l1, l2] = VIEW_TITLES[view] || ['', ''];
+        document.getElementById('bc-level1').textContent = l1;
+        document.getElementById('bc-level2').textContent = l2;
+
+        if (view === 'documents') loadDocuments();
+        if (view === 'knowledge-base') loadKnowledgeBases();
+        if (view === 'settings') loadConfig();
+        if (view === 'dashboard') loadDashboard();
+    }
+
+    document.querySelectorAll('[data-view]').forEach(el => {
+        el.addEventListener('click', () => switchView(el.dataset.view));
+    });
+
+    // ========== Documents ==========
+    let docState = { page: 1, size: 10, keyword: '', kb: '', status: '' };
+
+    async function loadDocuments() {
+        const tbody = document.getElementById('documents-tbody');
+        tbody.innerHTML = '<tr><td colspan="10" class="loading">加载中...</td></tr>';
+        try {
+            const data = await api('/documents');
+            const docs = Array.isArray(data) ? data : (data && data.items) || [];
+            renderDocuments(docs);
+            renderDocStats(docs);
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="10" class="empty">加载失败，请检查后端服务</td></tr>';
+        }
+    }
+
+    function renderDocuments(docs) {
+        const tbody = document.getElementById('documents-tbody');
+        if (!docs.length) {
+            tbody.innerHTML = '<tr><td colspan="10" class="empty"><div class="icon">📂</div>暂无文档，请先上传</td></tr>';
+            document.getElementById('pagination-info').textContent = '共 0 条记录';
+            document.getElementById('pagination-pages').innerHTML = '';
+            return;
+        }
+        const filtered = docs.filter(d => filterDoc(d));
+        const start = (docState.page - 1) * docState.size;
+        const pageData = filtered.slice(start, start + docState.size);
+        tbody.innerHTML = pageData.map(d => renderDocRow(d)).join('');
+        renderPagination(filtered.length);
+    }
+
+    function filterDoc(d) {
+        if (docState.keyword) {
+            const k = docState.keyword.toLowerCase();
+            if (!((d.fileName || '').toLowerCase().includes(k))) return false;
+        }
+        if (docState.kb && d.knowledgeBaseId !== docState.kb) return false;
+        if (docState.status && d.status !== docState.status) return false;
+        return true;
+    }
+
+    function renderDocRow(d) {
+        const ext = (d.fileType || getExt(d.fileName) || 'other').toLowerCase();
+        const size = formatSize(d.fileSize || 0);
+        const status = mapStatus(d.status || 'COMPLETED');
+        const kb = d.knowledgeBaseId || 'default';
+        const time = formatTime(d.createdAt);
+        return `<tr>
+        <td><input type="checkbox" class="doc-check" data-id="${d.documentId}"></td>
+        <td>
+            <div class="file-cell">
+                <div class="file-icon ${ext}">${(ext || '?').substring(0, 3).toUpperCase()}</div>
+                <span>${escapeHtml(d.fileName || '')}</span>
+            </div>
+        </td>
+        <td>${escapeHtml(d.fileName || '')}</td>
+        <td><span class="tag ${kbTagClass(kb)}">${escapeHtml(kb)}</span></td>
+        <td>${ext.toUpperCase()}</td>
+        <td>${size}</td>
+        <td>${d.chunkCount ?? '--'}</td>
+        <td><span class="status status-completed">${status}</span></td>
+        <td>${time}</td>
+        <td>
+            <div class="row-actions">
+                <button class="btn btn-sm" onclick="viewDoc('${d.documentId}')" title="查看">👁</button>
+                <button class="btn btn-sm" onclick="reprocessOne('${d.documentId}')" title="重新处理">🔄</button>
+                <button class="btn btn-sm" onclick="downloadDoc('${d.documentId}')" title="下载">⬇</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteDoc('${d.documentId}')" title="删除">🗑</button>
+            </div>
+        </td>
+    </tr>`;
+    }
+
+    function renderPagination(total) {
+        const totalPages = Math.max(1, Math.ceil(total / docState.size));
+        if (docState.page > totalPages) docState.page = totalPages;
+        document.getElementById('pagination-info').textContent = `共 ${total} 条记录`;
+        const pages = document.getElementById('pagination-pages');
+        let html = `<button class="page-btn" ${docState.page === 1 ? 'disabled' : ''} onclick="goPage(${docState.page - 1})">‹</button>`;
+        const start = Math.max(1, docState.page - 2);
+        const end = Math.min(totalPages, docState.page + 2);
+        if (start > 1) html += `<button class="page-btn" onclick="goPage(1)">1</button>` + (start > 2 ? '<span>...</span>' : '');
+        for (let i = start; i <= end; i++) {
+            html += `<button class="page-btn ${i === docState.page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+        }
+        if (end < totalPages) html += (end < totalPages - 1 ? '<span>...</span>' : '') + `<button class="page-btn" onclick="goPage(${totalPages})">${totalPages}</button>`;
+        html += `<button class="page-btn" ${docState.page === totalPages ? 'disabled' : ''} onclick="goPage(${docState.page + 1})">›</button>`;
+        pages.innerHTML = html;
+    }
+
+    function goPage(p) {
+        if (p < 1) return;
+        docState.page = p;
+        loadDocuments();
+    }
+    function changePageSize(s) {
+        docState.size = parseInt(s);
+        docState.page = 1;
+        loadDocuments();
+    }
+    function toggleCheckAll(cb) {
+        document.querySelectorAll('.doc-check').forEach(c => c.checked = cb.checked);
+    }
+    function resetDocSearch() {
+        docState = { page: 1, size: 10, keyword: '', kb: '', status: '' };
+        document.getElementById('doc-search-name').value = '';
+        document.getElementById('doc-search-kb').value = '';
+        document.getElementById('doc-search-status').value = '';
+        loadDocuments();
+    }
+
+    document.getElementById('doc-search-name').addEventListener('input', e => {
+        docState.keyword = e.target.value;
+        docState.page = 1;
+        loadDocuments();
+    });
+
+    async function deleteDoc(id) {
+        if (!confirm('确定删除该文档及其全部 Chunk？')) return;
+        try {
+            await api('/documents/' + id, { method: 'DELETE' });
+            toast('删除成功');
+            loadDocuments();
+        } catch {}
+    }
+
+    async function batchDelete() {
+        const ids = Array.from(document.querySelectorAll('.doc-check:checked')).map(c => c.dataset.id);
+        if (!ids.length) { toast('请先勾选文档', 'info'); return; }
+        if (!confirm(`确定删除选中的 ${ids.length} 个文档？`)) return;
+        for (const id of ids) {
+            await api('/documents/' + id, { method: 'DELETE' });
+        }
+        toast('批量删除成功');
+        loadDocuments();
+    }
+
+    async function viewDoc(id) {
+        try {
+            const d = await api('/documents/' + id);
+            const body = `
+                <div style="line-height:2;">
+                    <div><b>文档 ID：</b>${escapeHtml(d.documentId)}</div>
+                    <div><b>文件名：</b>${escapeHtml(d.fileName || '')}</div>
+                    <div><b>类型：</b>${escapeHtml(d.fileType || '')}</div>
+                    <div><b>Chunk 数：</b>${d.chunkCount ?? '--'}</div>
+                    <div><b>创建时间：</b>${formatTime(d.createdAt)}</div>
+                </div>
+            `;
+            showModal('文档详情', body);
+        } catch {}
+    }
+
+    function reprocessOne(id) {
+        toast('重新处理功能开发中', 'info');
+    }
+    function downloadDoc(id) {
+        toast('下载功能开发中', 'info');
+    }
+
+    // ========== Dashboard ==========
+    async function loadDashboard() {
+        try {
+            const data = await api('/documents');
+            const docs = Array.isArray(data) ? data : [];
+            renderDocStats(docs);
+        } catch {}
+    }
+
+    function renderDocStats(docs) {
+        const total = docs.length;
+        const processed = docs.filter(d => d.chunkCount && d.chunkCount > 0).length;
+        const chunks = docs.reduce((sum, d) => sum + (d.chunkCount || 0), 0);
+        const vectors = chunks;
+        const storage = docs.reduce((sum, d) => sum + (d.fileSize || 0), 0);
+        const rate = total ? Math.round(processed / total * 100) : 0;
+
+        setText('doc-stat-total', total);
+        setText('stat-total', total);
+        setText('doc-stat-processed', processed);
+        setText('stat-processed', processed);
+        setText('doc-stat-processed-rate', rate + '%');
+        setText('stat-processed-rate', rate + '%');
+        setText('doc-stat-chunks', formatNumber(chunks));
+        setText('stat-chunks', formatNumber(chunks));
+        setText('doc-stat-vectors', formatNumber(vectors));
+        setText('stat-vectors', formatNumber(vectors));
+        setText('doc-stat-storage', formatSize(storage));
+        setText('stat-storage', formatSize(storage));
+        setText('doc-stat-storage-rate', Math.min(100, Math.round(storage / (10 * 1024 * 1024 * 1024) * 100)) + '%');
+        setText('stat-storage-rate', Math.min(100, Math.round(storage / (10 * 1024 * 1024 * 1024) * 100)) + '%');
+
+        renderDonut('chart-types', 'legend-types', docs, 'fileType', ['#1890ff','#2f54eb','#fa8c16','#52c41a','#8c8c8c']);
+        renderDonut('chart-status', 'legend-status', docs, '_status', ['#52c41a','#1890ff','#faad14','#ff4d4f']);
+        renderDonut('doc-chart-types', 'doc-legend-types', docs, 'fileType', ['#1890ff','#2f54eb','#fa8c16','#52c41a','#8c8c8c']);
+        renderDonut('doc-chart-status', 'doc-legend-status', docs, '_status', ['#52c41a','#1890ff','#faad14','#ff4d4f']);
+        renderRecent('recent-uploads', docs);
+        renderRecent('doc-recent-uploads', docs);
+    }
+
+    function mapStatus(s) {
+        const map = {
+            'COMPLETED': '已完成', 'PROCESSING': '处理中', 'PENDING': '待处理',
+            'FAILED': '失败', 'completed': '已完成', 'processing': '处理中',
+            'pending': '待处理', 'failed': '失败'
+        };
+        return map[s] || '已完成';
+    }
+
+    function getExt(name) {
+        if (!name) return '';
+        const i = name.lastIndexOf('.');
+        return i >= 0 ? name.substring(i + 1) : '';
+    }
+
+    function formatSize(bytes) {
+        if (!bytes) return '--';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    }
+    function formatNumber(n) {
+        return n.toLocaleString();
+    }
+    function formatTime(ts) {
+        if (!ts) return '--';
+        const d = new Date(typeof ts === 'number' ? ts : Date.parse(ts));
+        if (isNaN(d.getTime())) return ts;
+        const pad = x => x < 10 ? '0' + x : x;
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' +
+               pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    function setText(id, v) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = v;
+    }
+
+    function escapeHtml(s) {
+        if (s == null) return '';
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        })[c]);
+    }
+
+    function kbTagClass(kb) {
+        const map = { 'default': 'tag-blue', 'Java': 'tag-green', '中间件': 'tag-orange',
+                      '项目文档': 'tag-purple', '开发规范': 'tag-cyan', '运维文档': 'tag-red' };
+        return map[kb] || 'tag-blue';
+    }
+
+    // SVG donut chart
+    function renderDonut(chartId, legendId, docs, key, colors) {
+        const counts = {};
+        docs.forEach(d => {
+            let k;
+            if (key === 'fileType') {
+                k = (d.fileType || getExt(d.fileName) || 'other').toLowerCase();
+                counts[k] = (counts[k] || 0) + 1;
+            } else if (key === '_status') {
+                counts[mapStatus(d.status || 'COMPLETED')] = (counts[mapStatus(d.status || 'COMPLETED')] || 0) + 1;
+            }
+        });
+        const entries = Object.entries(counts);
+        const total = entries.reduce((s, [_, v]) => s + v, 0);
+        const chart = document.getElementById(chartId);
+        const legend = document.getElementById(legendId);
+        if (!total) {
+            chart.innerHTML = '';
+            legend.innerHTML = '<li class="empty" style="padding:0;">暂无数据</li>';
+            return;
+        }
+
+        const R = 60, r = 40;
+        let acc = 0;
+        const paths = entries.map(([k, v], i) => {
+            const start = acc / total * Math.PI * 2 - Math.PI / 2;
+            acc += v;
+            const end = acc / total * Math.PI * 2 - Math.PI / 2;
+            const large = end - start > Math.PI ? 1 : 0;
+            const sx = 70 + (R + r) / 2 * Math.cos(start);
+            const sy = 70 + (R + r) / 2 * Math.sin(start);
+            const ex = 70 + (R + r) / 2 * Math.cos(end);
+            const ey = 70 + (R + r) / 2 * Math.sin(end);
+            const color = colors[i % colors.length];
+            return `<path d="M${sx} ${sy} A${(R+r)/2} ${(R+r)/2} 0 ${large} 1 ${ex} ${ey}" stroke="${color}" stroke-width="${R-r}" fill="none"/>`;
+        }).join('');
+
+        chart.innerHTML = `
+            <svg viewBox="0 0 140 140" width="140" height="140">
+                <circle cx="70" cy="70" r="${(R+r)/2}" fill="#fafafa"/>
+                ${paths}
+            </svg>
+            <div class="donut-center">
+                <div class="num">${total}</div>
+                <div class="lbl">总数</div>
+            </div>
+        `;
+
+        legend.innerHTML = entries.map(([k, v], i) => {
+            const pct = total ? Math.round(v / total * 100) : 0;
+            const color = colors[i % colors.length];
+            return `<li class="legend-item">
+                <span class="legend-dot" style="background:${color};"></span>
+                <span class="legend-name">${escapeHtml(k)}</span>
+                <span class="legend-val">${v} (${pct}%)</span>
+            </li>`;
+        }).join('');
+    }
+
+    function renderRecent(elId, docs) {
+        const el = document.getElementById(elId);
+        const recent = [...docs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5);
+        if (!recent.length) {
+            el.innerHTML = '<li class="empty" style="padding:20px;">暂无上传</li>';
+            return;
+        }
+        el.innerHTML = recent.map(d => {
+            const ext = (d.fileType || getExt(d.fileName) || 'other').toLowerCase();
+            return `<li class="recent-item">
+                <div class="recent-icon file-icon ${ext}">${(ext || '?').substring(0,3).toUpperCase()}</div>
+                <span class="recent-name">${escapeHtml(d.fileName || '')}</span>
+                <span class="recent-time">${formatTime(d.createdAt)}</span>
+            </li>`;
+        }).join('');
+    }
+
+    // ========== Upload ==========
+    let uploadFiles = [];
+    const uploadArea = document.getElementById('upload-area');
+    const uploadInput = document.getElementById('upload-input');
+    uploadArea.addEventListener('click', () => uploadInput.click());
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        addUploadFiles(e.dataTransfer.files);
+    });
+    uploadInput.addEventListener('change', e => addUploadFiles(e.target.files));
+
+    function addUploadFiles(files) {
+        for (const f of files) {
+            uploadFiles.push({ file: f, status: 'pending' });
+        }
+        renderUploadList();
+        document.getElementById('upload-list-wrap').style.display = 'block';
+        document.getElementById('btn-upload-submit').disabled = false;
+    }
+    function clearUploadList() {
+        uploadFiles = [];
+        renderUploadList();
+        document.getElementById('upload-list-wrap').style.display = 'none';
+        document.getElementById('btn-upload-submit').disabled = true;
+    }
+    function renderUploadList() {
+        document.getElementById('upload-count').textContent = uploadFiles.length;
+        document.getElementById('upload-tbody').innerHTML = uploadFiles.map((u, i) => {
+            const status = u.status === 'success' ? '✅ 成功' : u.status === 'error' ? '❌ 失败' : '⏳ 等待';
+            const cls = u.status === 'success' ? 'status-completed' : u.status === 'error' ? 'status-failed' : 'status-pending';
+            return `<tr>
+                <td>${escapeHtml(u.file.name)}</td>
+                <td>${formatSize(u.file.size)}</td>
+                <td>${getExt(u.file.name).toUpperCase()}</td>
+                <td><span class="status ${cls}">${status}</span></td>
+                <td><button class="btn btn-sm btn-danger" onclick="removeUpload(${i})">移除</button></td>
+            </tr>`;
+        }).join('');
+    }
+    function removeUpload(i) {
+        uploadFiles.splice(i, 1);
+        renderUploadList();
+        if (!uploadFiles.length) document.getElementById('upload-list-wrap').style.display = 'none';
+        document.getElementById('btn-upload-submit').disabled = uploadFiles.length > 0;
+    }
+    async function submitUploads() {
+        for (let i = 0; i < uploadFiles.length; i++) {
+            const u = uploadFiles[i];
+            if (u.status === 'success') continue;
+            try {
+                const fd = new FormData();
+                fd.append('file', u.file);
+                const kb = (document.getElementById('upload-kb').value || 'default').trim();
+                const resp = await fetch(API_BASE + '/documents/upload?tenantId=default&knowledgeBaseId=' + encodeURIComponent(kb), {
+                    method: 'POST', body: fd
+                });
+                if (resp.ok) {
+                    u.status = 'success';
+                } else {
+                    u.status = 'error';
+                }
+            } catch {
+                u.status = 'error';
+            }
+            renderUploadList();
+        }
+        toast('上传完成');
+        loadDocuments();
+    }
+
+    // ========== Knowledge Base ==========
+    async function loadKnowledgeBases() {
+        const tbody = document.getElementById('kb-tbody');
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">加载中...</td></tr>';
+        try {
+            const data = await api('/knowledge-bases');
+            const kbs = Array.isArray(data) ? data : [];
+            fillKbSelects(kbs);
+            if (!kbs.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty"><div class="icon">📚</div>暂无知识库，点击「新建知识库」创建</td></tr>';
+                return;
+            }
+            tbody.innerHTML = kbs.map(k => `
+                <tr>
+                    <td>${escapeHtml(k.knowledgeBaseId)}</td>
+                    <td>${escapeHtml(k.name || '')}</td>
+                    <td>${escapeHtml(k.description || '')}</td>
+                    <td><span class="tag ${kbTagClass(k.tenantId)}">${escapeHtml(k.tenantId || 'default')}</span></td>
+                    <td>${k.docCount != null ? k.docCount : 0}</td>
+                    <td>${formatTime(k.createdAt)}</td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="btn btn-sm btn-danger" onclick="deleteKb('${escapeHtml(k.knowledgeBaseId)}')"
+                                ${k.knowledgeBaseId === 'default' ? 'disabled title="系统预置不可删除"' : 'title="删除"'}">🗑</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">加载失败，请检查后端服务</td></tr>';
+        }
+    }
+
+    function fillKbSelects(kbs) {
+        const docSel = document.getElementById('doc-search-kb');
+        const upSel = document.getElementById('upload-kb');
+        if (docSel) {
+            const cur = docSel.value;
+            docSel.innerHTML = '<option value="">全部知识库</option>'
+                + kbs.map(k => `<option value="${escapeHtml(k.knowledgeBaseId)}">${escapeHtml(k.name || k.knowledgeBaseId)}</option>`).join('');
+            docSel.value = cur;
+        }
+        if (upSel) {
+            const cur = upSel.value || 'default';
+            upSel.innerHTML = '<option value="default">default（默认）</option>'
+                + kbs.filter(k => k.knowledgeBaseId !== 'default')
+                    .map(k => `<option value="${escapeHtml(k.knowledgeBaseId)}">${escapeHtml(k.name || k.knowledgeBaseId)}</option>`).join('');
+            upSel.value = cur;
+        }
+        const qSel = document.getElementById('search-kb');
+        if (qSel) {
+            const cur = qSel.value;
+            qSel.innerHTML = '<option value="">全部（查询所有库）</option>'
+                + kbs.map(k => `<option value="${escapeHtml(k.knowledgeBaseId)}">${escapeHtml(k.name || k.knowledgeBaseId)}</option>`).join('');
+            qSel.value = cur;
+        }
+    }
+
+    function showCreateKbModal() {
+        const body = `
+            <div style="line-height:2.4;">
+                <div><b>知识库ID</b><input class="input" id="kb-form-id" placeholder="留空自动生成" style="width:100%;"></div>
+                <div><b>名称</b><input class="input" id="kb-form-name" placeholder="必填" style="width:100%;"></div>
+                <div><b>描述</b><input class="input" id="kb-form-desc" placeholder="可选" style="width:100%;"></div>
+                <div><b>租户</b><input class="input" id="kb-form-tenant" placeholder="default" style="width:100%;"></div>
+            </div>
+        `;
+        showModal('新建知识库', body,
+            '<button class="btn" onclick="closeModal()">取消</button>'
+            + '<button class="btn btn-primary" onclick="submitCreateKb()">创建</button>');
+    }
+
+    async function submitCreateKb() {
+        const id = document.getElementById('kb-form-id').value.trim();
+        const name = document.getElementById('kb-form-name').value.trim();
+        const desc = document.getElementById('kb-form-desc').value.trim();
+        const tenant = document.getElementById('kb-form-tenant').value.trim();
+        if (!name) { toast('请填写名称', 'info'); return; }
+        try {
+            await api('/knowledge-bases', { method: 'POST', body: { knowledgeBaseId: id, name, description: desc, tenantId: tenant } });
+            toast('知识库创建成功');
+            closeModal();
+            loadKnowledgeBases();
+        } catch {}
+    }
+
+    async function deleteKb(id) {
+        if (id === 'default') { toast('默认知识库不可删除', 'info'); return; }
+        if (!confirm('确定删除知识库「' + id + '」？其下全部文档将一并删除')) return;
+        try {
+            await api('/knowledge-bases/' + id, { method: 'DELETE' });
+            toast('删除成功');
+            loadKnowledgeBases();
+        } catch {}
+    }
+
+    // ========== Search ==========
+    async function doSearch() {
+        const query = document.getElementById('search-query').value.trim();
+        if (!query) { toast('请输入查询', 'info'); return; }
+        const topK = parseInt(document.getElementById('search-topk').value || 5);
+        const kb = document.getElementById('search-kb').value.trim();
+        const tenant = document.getElementById('search-tenant').value.trim();
+        const body = { query, topK, filter: {} };
+        if (kb) body.filter.knowledgeBaseId = kb;
+        if (tenant) body.filter.tenantId = tenant;
+
+        const wrap = document.getElementById('search-results');
+        wrap.innerHTML = '<div class="loading">检索中...</div>';
+        try {
+            const data = await api('/query', { method: 'POST', body });
+            const ctxs = (data && data.contexts) || [];
+            if (!ctxs.length) {
+                wrap.innerHTML = '<div class="empty"><div class="icon">🔍</div>未检索到相关内容</div>';
+                return;
+            }
+            wrap.innerHTML = ctxs.map((c, i) => `
+                <div class="result-item">
+                    <div class="meta">
+                        <span class="score">#${i + 1}</span>
+                        <span>📄 ${escapeHtml(c.documentId || '')}</span>
+                        <span>分片 ${c.chunkIndex != null ? c.chunkIndex : '--'}</span>
+                    </div>
+                    <div class="content">${escapeHtml((c.content || '').substring(0, 500))}${(c.content || '').length > 500 ? '...' : ''}</div>
+                </div>
+            `).join('');
+        } catch {
+            wrap.innerHTML = '<div class="empty">检索失败</div>';
+        }
+    }
+
+    async function doVectorSearch() {
+        const query = document.getElementById('vs-query').value.trim();
+        if (!query) { toast('请输入查询', 'info'); return; }
+        const topK = parseInt(document.getElementById('vs-topk').value || 5);
+        const wrap = document.getElementById('vs-results');
+        wrap.innerHTML = '<div class="loading">搜索中...</div>';
+        try {
+            const data = await api('/search', { method: 'POST', body: { query, topK } });
+            const items = (data && data.results) || [];
+            if (!items.length) {
+                wrap.innerHTML = '<div class="empty"><div class="icon">🎯</div>未找到相似内容</div>';
+                return;
+            }
+            wrap.innerHTML = items.map((c, i) => `
+                <div class="result-item">
+                    <div class="meta">
+                        <span class="score">#${i + 1}</span>
+                        <span>📄 ${escapeHtml(c.documentId || '')}</span>
+                        <span>分片 ${c.chunkIndex != null ? c.chunkIndex : '--'}</span>
+                    </div>
+                    <div class="content">${escapeHtml((c.content || '').substring(0, 500))}${(c.content || '').length > 500 ? '...' : ''}</div>
+                </div>
+            `).join('');
+        } catch {
+            wrap.innerHTML = '<div class="empty">搜索失败</div>';
+        }
+    }
+
+    // ========== Settings ==========
+    function settingsRow(label, value, placeholder) {
+        return `<div style="display:flex;align-items:center;margin-bottom:12px;">
+            <span style="width:100px;color:#666;font-size:13px;flex-shrink:0;">${label}</span>
+            <input class="input" value="${escapeHtml(String(value ?? ''))}" placeholder="${placeholder || '未配置'}" disabled
+                style="flex:1;background:#fafafa;color:#333;">
+        </div>`;
+    }
+    function settingsCard(icon, title, rows) {
+        return `<div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:18px;">
+            <div style="font-weight:600;margin-bottom:14px;">${icon} ${title}</div>
+            ${rows}
+        </div>`;
+    }
+    async function loadConfig() {
+        const grid = document.getElementById('settings-grid');
+        if (!grid) return;
+        grid.innerHTML = '<div class="loading">加载中...</div>';
+        try {
+            const cfg = (await api('/config', { method: 'GET' })) || {};
+            const rag = cfg.rag || {}, chunk = rag.chunk || {}, retrieval = rag.retrieval || {};
+            const redis = cfg.redis || {};
+            const emb = cfg.embedding || {}, embApi = emb.api || {};
+            grid.innerHTML = [
+                settingsCard('📄', 'RAG 配置',
+                    settingsRow('向量库类型', rag['vector-store']) +
+                    settingsRow('Chunk 大小', chunk.size) +
+                    settingsRow('Overlap', chunk.overlap) +
+                    settingsRow('检索 Top-K', retrieval['top-k'])),
+                settingsCard('🗄️', 'Redis 配置',
+                    settingsRow('主机地址', redis.host) +
+                    settingsRow('端口号', redis.port) +
+                    settingsRow('密码', redis.password ? '******' : '', '未设置') +
+                    settingsRow('用户名', redis.username, 'default')),
+                settingsCard('🧠', 'Embedding 配置',
+                    settingsRow('提供商', emb.provider) +
+                    settingsRow('API 地址', embApi['base-url']) +
+                    settingsRow('模型名称', embApi.model) +
+                    settingsRow('向量维度', embApi.dimensions)),
+            ].join('');
+        } catch (e) {
+            grid.innerHTML = '<div class="empty">配置加载失败，请检查后端服务</div>';
+        }
+    }
+
+    // ========== Init ==========
+    document.addEventListener('DOMContentLoaded', () => {
+        loadDocuments();
+        loadKnowledgeBases();
+    });
+    </script>
+</body>
+</html>

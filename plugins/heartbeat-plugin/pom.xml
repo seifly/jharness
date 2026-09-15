@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>heartbeat-plugin</artifactId>
+    <name>heartbeat-plugin</name>
+    <description>心跳服务插件</description>
+
+    <properties>
+        <plugin.id>heartbeat-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.heartbeat.HeartbeatPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>Heartbeat：Agent 心跳服务</plugin.description>
+    </properties>
+
+    <dependencies>
+        <!--
+          跨插件依赖（编译期）：
+          HeartbeatService 引用 models-plugin 的 LLMProvider 等。
+          注意：PF4J 每个插件独立类加载器，运行期该依赖无法直接共享类，
+          需在后续统一调整时，将共享数据结构提升至 plugin-framework 共享 SDK。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>models-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          TODO 跨插件依赖（待 config 分散到各插件后处理）：
+          HeartbeatService 引用 config.Config / HeartbeatConfig。
+        -->
+    </dependencies>
+</project>

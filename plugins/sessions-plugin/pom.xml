@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>sessions-plugin</artifactId>
+    <name>sessions-plugin</name>
+    <description>会话管理插件</description>
+
+    <properties>
+        <plugin.id>sessions-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.sessions.SessionsPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>Session：Agent 当前做到了哪里？</plugin.description>
+    </properties>
+
+    <dependencies>
+        <!-- JSON 处理（会话持久化） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- Jackson JSR310：支持 Instant 等 JDK8 时间类型 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <!--
+          跨插件依赖（编译期）：
+          Session/SessionManager 引用 models-plugin 中的 Message 类。
+          注意：PF4J 每个插件独立类加载器，运行期该依赖无法直接共享类，
+          需在后续统一调整时，将 Message 提升至 plugin-framework 共享 SDK。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>models-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,105 @@
+package cn.seifly.jharness.plugin.framework.config;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 模型配置（SDK 共享）
+ * 通过 definitions 定义具体模型与 provider 的映射关系。
+ *
+ * <p>此类作为跨插件共享数据结构提升至 plugin-framework SDK，
+ * 避免 PF4J 独立类加载器导致 workflow-plugin 在运行期抛出
+ * {@code NoClassDefFoundError}。
+ */
+@Getter
+@Setter
+public class ModelsConfig {
+
+    /**
+     * 模型定义映射表
+     * key: 模型名称（如 "qwen3-max", "gpt-4o"）
+     * value: 模型定义
+     */
+    @JsonProperty("definitions")
+    private Map<String, ModelDefinition> definitions = new HashMap<>();
+
+    public ModelsConfig() {
+        // 添加常用模型的默认定义
+
+        // 通义千问系列
+        ModelDefinition qwen3Max = new ModelDefinition("dashscope", "qwen3-max", 200000);
+        qwen3Max.setDescription("通义千问3.0最大版");
+        definitions.put("qwen3-max", qwen3Max);
+
+        ModelDefinition qwen36Plus = new ModelDefinition("dashscope", "qwen3.6-plus", 128000);
+        qwen36Plus.setDescription("通义千问3.6增强版");
+        definitions.put("qwen3.6-plus", qwen36Plus);
+
+        // GPT 系列
+        ModelDefinition gpt4o = new ModelDefinition("openai", "gpt-4o", 128000);
+        gpt4o.setDescription("GPT-4o 最新版");
+        definitions.put("gpt-4o", gpt4o);
+
+        ModelDefinition gpt4oMini = new ModelDefinition("openai", "gpt-4o-mini", 128000);
+        gpt4oMini.setDescription("GPT-4o 轻量版");
+        definitions.put("gpt-4o-mini", gpt4oMini);
+
+        // Claude 系列
+        ModelDefinition claudeSonnet = new ModelDefinition("anthropic", "claude-3-5-sonnet-20241022", 200000);
+        claudeSonnet.setDescription("Claude 3.5 Sonnet");
+        definitions.put("claude-3-5-sonnet-20241022", claudeSonnet);
+
+        ModelDefinition claudeHaiku = new ModelDefinition("anthropic", "claude-3-5-haiku-20241022", 200000);
+        claudeHaiku.setDescription("Claude 3.5 Haiku");
+        definitions.put("claude-3-5-haiku-20241022", claudeHaiku);
+
+        // 智谱系列
+        ModelDefinition glm47 = new ModelDefinition("zhipu", "glm-4.7", 128000);
+        glm47.setDescription("智谱GLM-4.7");
+        definitions.put("glm-4.7", glm47);
+
+        // Gemini 系列
+        ModelDefinition geminiFlash = new ModelDefinition("gemini", "gemini-2.0-flash-exp", 1000000);
+        geminiFlash.setDescription("Gemini 2.0 Flash");
+        definitions.put("gemini-2.0-flash-exp", geminiFlash);
+
+        // 本地模型示例
+        ModelDefinition llama31 = new ModelDefinition("ollama", "llama3.1", 128000);
+        llama31.setDescription("Llama 3.1 (本地)");
+        definitions.put("llama3.1", llama31);
+    }
+
+    /**
+     * 模型定义
+     */
+    @Getter
+    @Setter
+    public static class ModelDefinition {
+        @JsonProperty("provider")
+        private String provider;
+
+        @JsonProperty("model")
+        private String model;
+
+        @JsonProperty("max_context_size")
+        private Integer maxContextSize;
+
+        @JsonProperty("description")
+        private String description;
+
+        public ModelDefinition() {
+        }
+
+        public ModelDefinition(String provider, String model, Integer maxContextSize) {
+            this.provider = provider;
+            this.model = model;
+            this.maxContextSize = maxContextSize;
+        }
+    }
+}

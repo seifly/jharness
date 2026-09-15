@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>jharness</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>plugin-framework</artifactId>
+    <name>plugin-framework</name>
+    <description>扩展点 SDK：主应用与所有插件共同依赖，只包含接口定义</description>
+    <properties>
+        <!-- Redis 8 Vector Set 的 typed API（RedisVectorSetCommands）自 6.7.0.RELEASE 起提供 -->
+        <lettuce.version>6.7.1.RELEASE</lettuce.version>
+        <tika.version>2.9.2</tika.version>
+        <jackson.version>2.17.2</jackson.version>
+        <commons-io.version>2.16.1</commons-io.version>
+    </properties>
+    <dependencies>
+        <!-- 扩展点接口需继承 org.pf4j.ExtensionPoint -->
+        <dependency>
+            <groupId>org.pf4j</groupId>
+            <artifactId>pf4j</artifactId>
+        </dependency>
+        <!-- Redis 8 Vector Set 客户端（rag-plugin 向量检索，typed RedisVectorSetCommands）：
+             与 jedis 同一策略放在 SDK 侧共享，保证开发期（宿主 ClassLoader）与部署期（插件 fat-jar）一致 -->
+        <dependency>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
+            <version>${lettuce.version}</version>
+        </dependency>
+        <!-- JSON 序列化（ConfigStore.getJSON / putJSON） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- 文件解析：Apache Tika（PDF / DOCX / TXT / MD） -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+
+        <!-- JSON（解析 tokenizer.json / 响应序列化） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <!-- 工具类 -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>${commons-io.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+        <!-- SLF4J 日志门面 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

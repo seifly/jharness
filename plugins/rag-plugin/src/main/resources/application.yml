@@ -1,0 +1,66 @@
+# ============================================================================
+# RAG 插件默认配置（会被主应用 application.yml 中的同名配置覆盖）
+# 主应用 application.yml 示例：
+#   rag:
+#     vector-store: redis        # redis | pgvector | qdrant | milvus | memory
+#     chunk:
+#       size: 800
+#       overlap: 100
+#     retrieval:
+#       top-k: 5
+#       rerank:
+#         enabled: true          # 是否启用重排序（精排）
+#         candidate-size: 20     # 向量召回候选数（需 >= top-k），供 reranker 精排后取 top-k
+#   rerank:
+#     provider: ollama           # ollama
+#     api:
+#       base-url: http://localhost:11434/api
+#       model: qwen3-reranker:0.6b
+#   redis:
+#     host: localhost
+#     port: 6379
+#   embedding:
+#     provider: qwen3            # qwen3 | openai（OpenAI 兼容 /v1/embeddings）
+#     api:
+#       base-url: http://127.0.0.1:9000/v1
+#       model: Qwen3-Embedding-0.6B
+#       dimensions: 1024
+# ============================================================================
+rag:
+  vector-store: redis
+  chunk:
+    size: 800
+    overlap: 100
+  retrieval:
+    top-k: 5
+    rerank:
+      # 启用重排序（精排）：向量召回放大候选集后，用本机 Ollama Qwen3-Reranker-0.6B 重新打分排序
+      enabled: true
+      # 粗排候选集大小（需 >= top-k），reranker 在这么多候选上精排后取 top-k
+      candidate-size: 20
+
+rerank:
+  provider: ollama
+  api:
+    # 本机 Ollama 服务地址（注意与 embedding 的 9000 端口不同，Ollama 默认 11434）
+    # qwen3-reranker:0.6b 需先执行：ollama pull qwen3-reranker:0.6b
+    # （ollama list 中 Type 应为 reranker，而非 llm）
+    base-url: http://127.0.0.1:9000/v1
+    model: Qwen3-Reranker-0.6B-mxfp8
+    key: "sk-omlx-seifly"
+
+redis:
+  host: localhost
+  port: 6379
+  # 本地 Redis 无密码，无需 username / password；如需鉴权取消注释：
+  # password: ""
+  # username: default
+
+embedding:
+  provider: qwen3
+  api:
+    # 本地 Qwen3-Embedding-0.6B 推理服务（OpenAI 兼容接口）
+    base-url: http://127.0.0.1:9000/v1
+    model: Qwen3-Embedding-0.6B-4bit-DWQ
+    dimensions: 1024
+    key: "sk-omlx-seifly"

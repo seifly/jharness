@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>workflow-plugin</artifactId>
+    <name>workflow-plugin</name>
+    <description>工作流插件</description>
+
+    <properties>
+        <plugin.id>workflow-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.workflow.WorkflowPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>Workflow：多个 Agent 怎么协作？</plugin.description>
+    </properties>
+
+    <dependencies>
+        <!-- JSON 处理（WorkflowGenerator 调用 LLM 解析 JSON） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- dotenv 环境变量加载（ConfigLoader） -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <!--
+          跨插件依赖（编译期）：
+          #1 重构后 LLMProvider/LLMResponse/Message/ToolCall/ToolDefinition/StreamEvent 已提升至
+          plugin-framework SDK（cn.seifly.jharness.plugin.framework.llm），workflow 不再引用
+          models-plugin 的 HTTPProvider。本依赖仅保留对 models-plugin 的
+          config.ProvidersConfig / config.ModelsConfig 配置类的编译期引用（provided）。
+          运行期共享：由 plugin.properties 的 plugin.dependencies=models-plugin 声明，
+          SpringPluginManager#loadPlugins 按依赖拓扑排序加载，使 models-plugin 的类
+          挂入 workflow-plugin 类加载器的父链（详见 plugin-app/core/SpringPluginManager）。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>models-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          跨插件依赖（编译期）：
+          ReActExecutor / SessionSummarizer / RoleAgent 引用 sessions-plugin 的 SessionManager / ToolCallRecord。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>sessions-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          #2 重构后已解除对 tools-plugin / memory-plugin 的编译期依赖：
+          原本引用的 ToolRegistry / TokenUsageStore / StreamAwareTool / MemoryStore / MemoryEvolver
+          已提升至 plugin-framework SDK 契约（ToolService / TokenUsageService / StreamAwareTool /
+          MemoryService），workflow 通过 ServiceRegistry 取得实现，
+          不再 <dependency> 依赖 tools-plugin / memory-plugin。
+
+          跨插件依赖（编译期）：
+          ContextBuilder / SkillsSection 引用 skills-plugin 的 SkillsLoader / SkillInfo 等。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>skills-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          跨插件依赖（编译期）：
+          WorkflowRuntime 在 SecurityGuard / SkillsLoader 就绪后注册标准工具
+          （ExecTool / SkillsTool / ReadFileTool 等），引用 tools-plugin 的 Tool 实现类。
+          运行期共享：plugin.dependencies=tools-plugin 声明拓扑顺序，确保类加载器父链包含 tools-plugin。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>tools-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          跨插件依赖（编译期）：
+          ReActExecutor / ProviderManager 引用 FeedbackManager / PromptOptimizer / EvaluationFeedback。
+          运行期共享：由 plugin.properties 的 plugin.dependencies=evolution-plugin 声明，
+          SpringPluginManager#loadPlugins 按依赖拓扑排序加载（详见 plugin-app/core/SpringPluginManager）。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>evolution-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          跨插件依赖（编译期）：
+          MessageRouter 引用 channel-plugin 的 Channel / ChannelManager。
+          运行期共享：由 plugin.properties 的 plugin.dependencies=channel-plugin 声明，
+          SpringPluginManager#loadPlugins 按依赖拓扑排序加载（详见 plugin-app/core/SpringPluginManager）。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>channel-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          跨插件依赖（编译期）：
+          Config 引用 mcp-plugin 的 MCPServersConfig。
+        -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>mcp-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

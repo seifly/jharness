@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>development-plugin</artifactId>
+    <name>development-plugin</name>
+    <description>开发辅助插件（骨架，控制器已迁移到 ui-plugin）</description>
+
+    <properties>
+        <plugin.id>development-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.development.DevelopmentPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>Development：开发辅助工具（骨架）</plugin.description>
+    </properties>
+</project>

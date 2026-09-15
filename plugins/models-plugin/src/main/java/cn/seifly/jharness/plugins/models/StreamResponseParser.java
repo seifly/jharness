@@ -1,0 +1,343 @@
+package cn.seifly.jharness.plugins.models;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import okio.BufferedSource;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import cn.seifly.jharness.plugin.framework.llm.LLMResponse;
+import cn.seifly.jharness.plugin.framework.llm.LlmService;
+import cn.seifly.jharness.plugin.framework.llm.ToolCall;
+
+/**
+ * LLM 流式响应解析器。
+ *
+ * 处理 SSE（Server-Sent Events）格式的流式数据，
+ * 支持增量内容和工具调用的实时解析。
+ */
+@Slf4j
+public class StreamResponseParser {
+
+    private final ObjectMapper objectMapper;
+
+    public StreamResponseParser() {
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public StreamResponseParser(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
+    /**
+     * 解析流式响应。
+     */
+    public LLMResponse parseStreamResponse(BufferedSource source, LlmService.StreamCallback callback) throws IOException {
+        StringBuilder fullContent = new StringBuilder();
+        List<ToolCall> toolCalls = new ArrayList<>();
+        String finishReason = "stop";
+        LLMResponse.UsageInfo usage = null;
+
+        try {
+            while (!source.exhausted()) {
+                String line = source.readUtf8Line();
+                if (line == null || line.trim().isEmpty()) {
+                    continue;
+                }
+
+                // SSE 格式: "data: {json}"
+                if (!line.startsWith("data: ")) {
+                    continue;
+                }
+
+                String data = line.substring(6).trim();
+
+                // 结束标记
+                if (data.equals("[DONE]")) {
+                    break;
+                }
+
+                try {
+                    JsonNode chunk = objectMapper.readTree(data);
+
+                    // 解析 usage 信息
+                    if (chunk.has("usage")) {
+                        usage = parseUsage(chunk.get("usage"));
+                    }
+
+                    if (!chunk.has("choices") || chunk.get("choices").isEmpty()) {
+                        continue;
+                    }
+
+                    JsonNode choice = chunk.get("choices").get(0);
+
+                    // 更新 finish_reason
+                    if (choice.has("finish_reason") && !choice.get("finish_reason").isNull()) {
+                        finishReason = choice.get("finish_reason").asText();
+                    }
+
+                    JsonNode delta = choice.get("delta");
+                    if (delta == null || delta.isNull()) {
+                        continue;
+                    }
+
+                    // 处理流式内容
+                    if (delta.has("content") && !delta.get("content").isNull()) {
+                        String content = delta.get("content").asText();
+                        if (content != null && !content.isEmpty()) {
+                            fullContent.append(content);
+                            if (callback != null) {
+                                callback.onChunk(content);
+                            }
+                        }
+                    }
+
+                    // 处理工具调用（流式模式下可能分块传输）
+                    if (delta.has("tool_calls")) {
+                        parseStreamToolCalls(delta.get("tool_calls"), toolCalls);
+                    }
+
+                } catch (Exception e) {
+                    log.error("解析流式数据块失败: {}", Map.of(
+                            "error_type", e.getClass().getSimpleName(),
+                            "error_message", e.getMessage(),
+                            "data_preview", data.length() > 200 ? data.substring(0, 200) : data
+                    ), e);
+                }
+            }
+        } catch (IOException e) {
+            log.error("流式响应读取错误: {}", Map.of(
+                    "error_type", e.getClass().getSimpleName(),
+                    "error_message", e.getMessage()
+            ), e);
+            throw e;
+        }
+
+        // 构建完整响应
+        return buildStreamResponse(fullContent.toString(), toolCalls, finishReason, usage);
+    }
+
+    /**
+     * 解析非流式 LLM 响应。
+     */
+    public LLMResponse parseResponse(String responseBody) throws IOException {
+        JsonNode root = objectMapper.readTree(responseBody);
+        LLMResponse response = new LLMResponse();
+
+        // 解析 token 使用统计
+        if (root.has("usage")) {
+            response.setUsage(parseUsage(root.get("usage")));
+        }
+
+        // 解析响应内容
+        if (!root.has("choices") || !root.get("choices").isArray() || root.get("choices").isEmpty()) {
+            response.setContent("");
+            response.setFinishReason("stop");
+            return response;
+        }
+
+        JsonNode choice = root.get("choices").get(0);
+        JsonNode messageNode = choice.get("message");
+
+        response.setFinishReason(choice.has("finish_reason") ? choice.get("finish_reason").asText() : "stop");
+        response.setContent(messageNode.has("content") && !messageNode.get("content").isNull()
+                ? messageNode.get("content").asText() : "");
+
+        // 解析工具调用
+        if (messageNode.has("tool_calls") && messageNode.get("tool_calls").isArray()) {
+            response.setToolCalls(parseToolCalls(messageNode.get("tool_calls")));
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("LLM response: {}", Map.of(
+                    "content_length", response.getContent() != null ? response.getContent().length() : 0,
+                    "tool_calls_count", response.hasToolCalls() ? response.getToolCalls().size() : 0,
+                    "finish_reason", response.getFinishReason()
+            ));
+        }
+
+        log.info("🔍 LLM Parsed Response (non-stream): {}", Map.of(
+                "content", response.getContent() != null && response.getContent().length() > 300
+                        ? response.getContent().substring(0, 300) + "..."
+                        : response.getContent(),
+                "has_tool_calls", response.hasToolCalls(),
+                "tool_calls", response.hasToolCalls() ? response.getToolCalls().toString() : "[]",
+                "finish_reason", response.getFinishReason()
+        ));
+
+        return response;
+    }
+
+    /**
+     * 构建流式响应对象。
+     */
+    private LLMResponse buildStreamResponse(String content, List<ToolCall> toolCalls,
+                                           String finishReason, LLMResponse.UsageInfo usage) {
+        LLMResponse response = new LLMResponse();
+        response.setContent(content);
+        response.setFinishReason(finishReason);
+        response.setUsage(usage);
+
+        if (!toolCalls.isEmpty()) {
+            // 解析所有工具调用的 arguments
+            for (ToolCall toolCall : toolCalls) {
+                if (toolCall.getArguments() != null && toolCall.getArguments().containsKey("_raw_args")) {
+                    String rawArgs = (String) toolCall.getArguments().get("_raw_args");
+
+                    // 检查 rawArgs 是否为空
+                    if (rawArgs == null || rawArgs.trim().isEmpty()) {
+                        toolCall.setArguments(new HashMap<>());
+                        continue;
+                    }
+
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> parsedArgs = objectMapper.readValue(rawArgs, Map.class);
+                        toolCall.setArguments(parsedArgs);
+                    } catch (Exception e) {
+                        log.error("解析工具调用参数失败", e);
+                        // 解析失败，保留原始字符串
+                        Map<String, Object> args = new HashMap<>();
+                        args.put("raw", rawArgs);
+                        toolCall.setArguments(args);
+                        log.warn("解析工具调用参数失败: {}", Map.of(
+                                "error_type", e.getClass().getSimpleName(),
+                                "error_message", e.getMessage(),
+                                "tool_name", toolCall.getName(),
+                                "raw_args_preview", rawArgs.length() > 100 ? rawArgs.substring(0, 100) : rawArgs
+                        ));
+                    }
+                }
+            }
+            response.setToolCalls(toolCalls);
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("LLM stream response: {}", Map.of(
+                    "content_length", content.length(),
+                    "tool_calls_count", toolCalls.size(),
+                    "finish_reason", finishReason
+            ));
+        }
+
+        log.info("🔍 LLM Parsed Response (stream): {}", Map.of(
+                "content", content.length() > 300 ? content.substring(0, 300) + "..." : content,
+                "has_tool_calls", !toolCalls.isEmpty(),
+                "tool_calls", !toolCalls.isEmpty() ? toolCalls.toString() : "[]",
+                "finish_reason", finishReason
+        ));
+
+        return response;
+    }
+
+    /**
+     * 解析流式工具调用（增量模式）。
+     */
+    private void parseStreamToolCalls(JsonNode toolCallsNode, List<ToolCall> toolCalls) {
+        for (JsonNode tcNode : toolCallsNode) {
+            int index = tcNode.has("index") ? tcNode.get("index").asInt() : 0;
+
+            // 确保列表有足够空间
+            while (toolCalls.size() <= index) {
+                ToolCall newToolCall = new ToolCall();
+                newToolCall.setArguments(new HashMap<>());
+                toolCalls.add(newToolCall);
+            }
+
+            ToolCall toolCall = toolCalls.get(index);
+
+            // 确保 arguments 不为 null
+            if (toolCall.getArguments() == null) {
+                toolCall.setArguments(new HashMap<>());
+            }
+
+            // 解析 ID
+            if (tcNode.has("id")) {
+                toolCall.setId(tcNode.get("id").asText());
+            }
+
+            // 解析 Type
+            if (tcNode.has("type")) {
+                toolCall.setType(tcNode.get("type").asText());
+            }
+
+            // 解析 Function（增量拼接）
+            if (tcNode.has("function")) {
+                JsonNode funcNode = tcNode.get("function");
+
+                // 解析函数名称
+                if (funcNode.has("name") && !funcNode.get("name").isNull()) {
+                    String name = funcNode.get("name").asText();
+                    if (name != null && !name.isEmpty()) {
+                        toolCall.setName(name);
+                    }
+                }
+
+                // 增量拼接参数字符串
+                if (funcNode.has("arguments")) {
+                    String argsChunk = funcNode.get("arguments").asText();
+                    Map<String, Object> args = toolCall.getArguments();
+                    String existing = (String) args.get("_raw_args");
+                    args.put("_raw_args", existing == null ? argsChunk : existing + argsChunk);
+                }
+            }
+        }
+    }
+
+    /**
+     * 解析 token 使用统计信息。
+     */
+    private LLMResponse.UsageInfo parseUsage(JsonNode usageNode) {
+        LLMResponse.UsageInfo usage = new LLMResponse.UsageInfo();
+        usage.setPromptTokens(usageNode.has("prompt_tokens") ? usageNode.get("prompt_tokens").asInt() : 0);
+        usage.setCompletionTokens(usageNode.has("completion_tokens") ? usageNode.get("completion_tokens").asInt() : 0);
+        usage.setTotalTokens(usageNode.has("total_tokens") ? usageNode.get("total_tokens").asInt() : 0);
+        return usage;
+    }
+
+    /**
+     * 解析工具调用列表。
+     */
+    private List<ToolCall> parseToolCalls(JsonNode toolCallsNode) {
+        List<ToolCall> toolCalls = new ArrayList<>();
+
+        for (JsonNode tcNode : toolCallsNode) {
+            ToolCall toolCall = new ToolCall();
+            toolCall.setId(tcNode.has("id") ? tcNode.get("id").asText() : UUID.randomUUID().toString());
+            toolCall.setType(tcNode.has("type") ? tcNode.get("type").asText() : "function");
+
+            if (tcNode.has("function")) {
+                JsonNode funcNode = tcNode.get("function");
+                String name = funcNode.has("name") ? funcNode.get("name").asText() : "";
+                String argsStr = funcNode.has("arguments") ? funcNode.get("arguments").asText() : "{}";
+
+                toolCall.setName(name);
+                toolCall.setArguments(parseToolArguments(argsStr));
+            }
+
+            toolCalls.add(toolCall);
+        }
+
+        return toolCalls;
+    }
+
+    /**
+     * 解析工具调用参数。
+     */
+    private Map<String, Object> parseToolArguments(String argsStr) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> args = objectMapper.readValue(argsStr, Map.class);
+            return args;
+        } catch (Exception e) {
+            Map<String, Object> args = new HashMap<>();
+            args.put("raw", argsStr);
+            return args;
+        }
+    }
+}

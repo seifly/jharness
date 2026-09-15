@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>channel-plugin</artifactId>
+    <name>channel-plugin</name>
+    <description>通道插件</description>
+
+    <properties>
+        <plugin.id>channel-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.channel.ChannelPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>Integration：Agent 怎么连接外部世界？</plugin.description>
+    </properties>
+
+    <dependencies>
+        <!-- HTTP 客户端（各通道发送消息、AliyunTranscriber 语音转录） -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+        <!-- JSON 处理（BaseChannel/WebhookServer/AliyunTranscriber 等） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- JSR310 时间类型支持（WechatChannel ObjectMapper 配置） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>models-plugin</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- 飞书 SDK（FeishuChannel） -->
+        <dependency>
+            <groupId>com.larksuite.oapi</groupId>
+            <artifactId>oapi-sdk</artifactId>
+            <version>2.5.3</version>
+        </dependency>
+        <!-- 微信 iLink SDK（WechatChannel） -->
+        <dependency>
+            <groupId>io.github.lith0924</groupId>
+            <artifactId>wechat-ilink-sdk</artifactId>
+            <version>2.2.2</version>
+        </dependency>
+        <!-- ZXing 二维码（WechatChannel 登录二维码） -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+        <!--
+          TODO 跨插件依赖（待 config 分散到各插件后处理）：
+          ChannelManager/WebhookServer/各通道实现引用 config.Config 和 config.ChannelsConfig
+          及其嵌套配置类（TelegramConfig/DiscordConfig/FeishuConfig 等）。
+          config/ 模块将分散到各插件内部，待后续统一调整时在 channel-plugin 内部创建
+          ChannelsConfig 类替代。
+        -->
+    </dependencies>
+</project>

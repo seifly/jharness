@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>cn.seifly.jharness</groupId>
+        <artifactId>plugins</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>hello-plugin</artifactId>
+    <name>hello-plugin</name>
+    <description>示例插件：中文问候（演示 Spring 依赖注入 + 第三方依赖打包）</description>
+
+    <!-- 覆盖父模块中的占位属性，生成正确的插件描述符 -->
+    <properties>
+        <plugin.id>hello-plugin</plugin.id>
+        <plugin.class>cn.seifly.jharness.plugins.hello.HelloPlugin</plugin.class>
+        <plugin.version>1.0.0</plugin.version>
+        <plugin.provider>seifly</plugin.provider>
+        <plugin.description>示例插件：中文问候，演示插件加载与扩展调用</plugin.description>
+    </properties>
+
+    <dependencies>
+        <!-- 演示：插件自带第三方依赖（会被 shade 打入插件包，随插件分发） -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+    </dependencies>
+</project>
